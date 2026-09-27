@@ -1,0 +1,253 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Diary.Desktop.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+        x:Class="Diary.Desktop.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Дневник"
+        Width="900" Height="600"
+        Background="{StaticResource BrushBackgroundApp}">
+
+	<Design.DataContext>
+		<vm:MainViewModel />
+	</Design.DataContext>
+
+	<Grid ColumnDefinitions="200,*">
+
+		<!-- ЛЕВАЯ ПАНЕЛЬ -->
+		<Border Grid.Column="0"
+                Background="{StaticResource BrushBackgroundPanel}"
+                Padding="12">
+			<TextBlock Text="Панель"
+                       Foreground="{StaticResource BrushTextSecondary}"
+                       FontSize="12" />
+		</Border>
+
+		<!-- ПРАВАЯ ЧАСТЬ -->
+		<Grid Grid.Column="1" RowDefinitions="Auto,*">
+
+			<!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+			<Border Grid.Row="0"
+                    Background="{StaticResource BrushBackgroundPanel}"
+                    Padding="12">
+				<Grid ColumnDefinitions="Auto,*,Auto">
+
+					<Button Grid.Column="0"
+                            Command="{Binding GoBackCommand}"
+                            Content="←"
+                            FontSize="18"
+                            Width="40" Height="40"
+                            Background="Transparent"
+                            Foreground="{StaticResource BrushTextPrimary}"
+                            IsVisible="{Binding IsOnMainScreen, Converter={x:Static BoolConverters.Not}}" />
+
+					<TextBlock Grid.Column="1"
+                               Text="{Binding CurrentTitle}"
+                               FontSize="20"
+                               FontWeight="Bold"
+                               Foreground="{StaticResource BrushTextPrimary}"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               IsVisible="{Binding IsOnFoldersScreen}" />
+
+					<TextBox Grid.Column="1"
+                             Text="{Binding SelectedFolder.Name, Mode=TwoWay, FallbackValue=''}"
+                             PlaceholderText="Название папки"
+                             FontSize="20"
+                             FontWeight="Bold"
+                             Foreground="{StaticResource BrushTextPrimary}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             VerticalAlignment="Center"
+                             Margin="12,0,0,0"
+                             IsVisible="{Binding IsOnNotesScreen}" />
+
+					<TextBox Grid.Column="1"
+                             Text="{Binding SelectedNote.Title, Mode=TwoWay, FallbackValue=''}"
+                             PlaceholderText="Заголовок"
+                             FontSize="20"
+                             FontWeight="Bold"
+                             Foreground="{StaticResource BrushTextPrimary}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             VerticalAlignment="Center"
+                             Margin="12,0,0,0"
+                             IsVisible="{Binding IsOnEditorScreen}" />
+
+					<Button Grid.Column="2"
+        Content="⋮"
+        FontSize="20"
+        Width="40" Height="40"
+        Background="Transparent"
+        Foreground="{StaticResource BrushTextPrimary}">
+						<Button.Flyout>
+							<MenuFlyout>
+								<MenuItem Header="Обновить данные"
+										  Command="{Binding RefreshCommand}" />
+							</MenuFlyout>
+						</Button.Flyout>
+					</Button>
+				</Grid>
+			</Border>
+
+			<!-- КОНТЕНТ -->
+			<Grid Grid.Row="1">
+
+				<!-- ЭКРАН 1: ПАПКИ -->
+				<ScrollViewer Padding="16"
+                              Background="{StaticResource BrushBackgroundApp}"
+                              IsVisible="{Binding IsOnFoldersScreen}">
+					<ItemsControl ItemsSource="{Binding Folders}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<WrapPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Button Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenFolderCommand}"
+                                        CommandParameter="{Binding}"
+                                        Width="160" Height="160"
+                                        Margin="8"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        BorderThickness="0">
+									<Button.ContextMenu>
+										<ContextMenu>
+											<MenuItem Header="Удалить"
+                                                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteFolderCommand}"
+                                                      CommandParameter="{Binding}" />
+										</ContextMenu>
+									</Button.ContextMenu>
+
+									<Border Background="{StaticResource BrushBackgroundCard}"
+                                            CornerRadius="12"
+                                            Padding="16">
+										<StackPanel VerticalAlignment="Center"
+                                                    HorizontalAlignment="Center">
+											<TextBlock Text="📁"
+                                                       FontSize="48"
+                                                       HorizontalAlignment="Center" />
+											<TextBlock Text="{Binding Name}"
+                                                       FontSize="14"
+                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       TextWrapping="Wrap"
+                                                       TextAlignment="Center"
+                                                       Margin="0,12,0,0" />
+										</StackPanel>
+									</Border>
+								</Button>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<!-- ЭКРАН 2: ЗАМЕТКИ В ПАПКЕ -->
+				<ScrollViewer Padding="16"
+                              Background="{StaticResource BrushBackgroundApp}"
+                              IsVisible="{Binding IsOnNotesScreen}">
+					<ItemsControl ItemsSource="{Binding Notes}">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<WrapPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Button Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenNoteCommand}"
+                                        CommandParameter="{Binding}"
+                                        Width="220" Height="160"
+                                        Margin="8"
+                                        Padding="0"
+                                        Background="Transparent"
+                                        BorderThickness="0">
+									<Button.ContextMenu>
+										<ContextMenu>
+											<MenuItem Header="Удалить"
+                                                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteNoteCommand}"
+                                                      CommandParameter="{Binding}" />
+										</ContextMenu>
+									</Button.ContextMenu>
+
+									<Border Background="{StaticResource BrushBackgroundCard}"
+                                            CornerRadius="12"
+                                            Padding="12">
+										<StackPanel>
+											<TextBlock Text="{Binding Title}"
+                                                       FontSize="16"
+                                                       FontWeight="Bold"
+                                                       Foreground="{StaticResource BrushTextPrimary}"
+                                                       TextWrapping="Wrap" />
+											<TextBlock Text="{Binding Content}"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource BrushTextSecondary}"
+                                                       TextWrapping="Wrap"
+                                                       MaxHeight="80"
+                                                       Margin="0,8,0,0" />
+										</StackPanel>
+									</Border>
+								</Button>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<!-- ЭКРАН 3: РЕДАКТОР -->
+				<Grid Background="{StaticResource BrushBackgroundApp}"
+                      IsVisible="{Binding IsOnEditorScreen}">
+
+					<TextBox Text="{Binding SelectedNote.Content, Mode=TwoWay, FallbackValue=''}"
+                             PlaceholderText="Начните печатать…"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             FontSize="14"
+                             Padding="16"
+                             Margin="16"
+                             Background="{StaticResource BrushBackgroundCard}"
+                             Foreground="{StaticResource BrushTextPrimary}"
+                             BorderThickness="0"
+                             CornerRadius="8"
+                             VerticalContentAlignment="Top" />
+				</Grid>
+
+				<!-- FAB: адаптивный -->
+				<Button HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,24,24"
+                        Width="56" Height="56"
+                        CornerRadius="28"
+                        Background="{StaticResource BrushAccent}"
+                        IsVisible="{Binding IsOnFoldersScreen}"
+                        Command="{Binding CreateFolderCommand}">
+					<Path Data="M 0,10 L 20,10 M 10,0 L 10,20"
+                          Stroke="{StaticResource BrushAccentText}"
+                          StrokeThickness="2.5"
+                          StrokeLineCap="Round"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center" />
+				</Button>
+
+				<Button HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Margin="0,0,24,24"
+                        Width="56" Height="56"
+                        CornerRadius="28"
+                        Background="{StaticResource BrushAccent}"
+                        IsVisible="{Binding IsOnNotesScreen}"
+                        Command="{Binding CreateNoteCommand}">
+					<Path Data="M 0,10 L 20,10 M 10,0 L 10,20"
+                          Stroke="{StaticResource BrushAccentText}"
+                          StrokeThickness="2.5"
+                          StrokeLineCap="Round"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center" />
+				</Button>
+			</Grid>
+		</Grid>
+	</Grid>
+</Window>

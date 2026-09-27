@@ -1,0 +1,39 @@
+# ============ .NET ============
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.userprefs
+
+# ============ Базы данных ============
+*.db
+*.db3
+*.db-shm
+*.db-wal
+diary.db
+
+# ============ Секреты (на будущее) ============
+appsettings.Development.json
+*.secret.json
+.env
+
+# ============ IDE ============
+.vscode/
+.idea/
+*.swp
+
+# ============ OS ============
+.DS_Store
+Thumbs.db
+
+# ============ MAUI / Android ============
+*.apk
+*.aab
+*.keystore
+
+# ============ Avalonia ============
+*.axaml.cs.bak
+
+# ============ Логи ============
+*.log

@@ -1,0 +1,220 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:vm="clr-namespace:Diary.Mobile.ViewModels"
+             xmlns:models="clr-namespace:Diary.Mobile.Models"
+             xmlns:converters="clr-namespace:Diary.Mobile.Converters"
+             x:Class="Diary.Mobile.MainPage"
+             x:Name="PageRoot"
+             BackgroundColor="#191919"
+             Shell.NavBarIsVisible="False">
+
+    <ContentPage.Resources>
+        <ResourceDictionary>
+            <converters:InverseBoolConverter x:Key="InverseBoolConverter" />
+        </ResourceDictionary>
+    </ContentPage.Resources>
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
+        <Grid Grid.Row="0"
+              ColumnDefinitions="Auto,*,Auto"
+              BackgroundColor="#202020"
+              Padding="12,10">
+
+            <Button Grid.Column="0"
+                    Text="←"
+                    FontSize="20"
+                    WidthRequest="44"
+                    HeightRequest="44"
+                    BackgroundColor="Transparent"
+                    TextColor="#E5E5E5"
+                    IsVisible="{Binding IsOnMainScreen, Converter={StaticResource InverseBoolConverter}}"
+                    Command="{Binding GoBackCommand}" />
+
+            <Label Grid.Column="1"
+                   Text="{Binding CurrentTitle}"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="#E5E5E5"
+                   VerticalOptions="Center"
+                   Margin="8,0"
+                   IsVisible="{Binding IsOnFoldersScreen}" />
+
+            <Entry Grid.Column="1"
+                   Text="{Binding SelectedFolder.Name, Mode=TwoWay}"
+                   Placeholder="Имя папки"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="#E5E5E5"
+                   BackgroundColor="Transparent"
+                   Margin="8,0"
+                   VerticalOptions="Center"
+                   IsVisible="{Binding IsOnNotesScreen}" />
+
+            <Entry Grid.Column="1"
+                   Text="{Binding SelectedNote.Title, Mode=TwoWay}"
+                   Placeholder="Заголовок"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="#E5E5E5"
+                   BackgroundColor="Transparent"
+                   Margin="8,0"
+                   VerticalOptions="Center"
+                   IsVisible="{Binding IsOnEditorScreen}" />
+
+            <Button Grid.Column="2"
+                    Text="⋮"
+                    FontSize="20"
+                    WidthRequest="44"
+                    HeightRequest="44"
+                    BackgroundColor="Transparent"
+                    TextColor="#E5E5E5"
+                    Clicked="OnMenuClicked" />
+        </Grid>
+
+        <!-- КОНТЕНТ -->
+        <Grid Grid.Row="1">
+
+            <!-- ЭКРАН 1: ПАПКИ -->
+            <CollectionView IsVisible="{Binding IsOnFoldersScreen}"
+                            ItemsSource="{Binding Folders}"
+                            SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout Orientation="Vertical"
+                                     Span="2"
+                                     HorizontalItemSpacing="12"
+                                     VerticalItemSpacing="12" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:LocalFolder">
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Execute">
+                                    <SwipeItem Text="Удалить"
+                                               BackgroundColor="#E53935"
+                                               Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.DeleteFolderCommand}"
+                                               CommandParameter="{Binding .}" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+                            <Border BackgroundColor="#252525"
+                                    Stroke="#333333"
+                                    StrokeThickness="1"
+                                    Padding="16"
+                                    StrokeShape="RoundRectangle 12"
+                                    HeightRequest="140">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenFolderCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout VerticalOptions="Center"
+                                                     HorizontalOptions="Center"
+                                                     Spacing="12">
+                                    <Label Text="📁" FontSize="40" HorizontalOptions="Center" />
+                                    <Label Text="{Binding Name}"
+                                           FontSize="14"
+                                           TextColor="#E5E5E5"
+                                           HorizontalTextAlignment="Center" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- ЭКРАН 2: ЗАМЕТКИ -->
+            <CollectionView IsVisible="{Binding IsOnNotesScreen}"
+                            ItemsSource="{Binding Notes}"
+                            SelectionMode="None">
+                <CollectionView.ItemsLayout>
+                    <GridItemsLayout Orientation="Vertical"
+                                     Span="2"
+                                     HorizontalItemSpacing="12"
+                                     VerticalItemSpacing="12" />
+                </CollectionView.ItemsLayout>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:LocalNote">
+                        <SwipeView>
+                            <SwipeView.RightItems>
+                                <SwipeItems Mode="Execute">
+                                    <SwipeItem Text="Удалить"
+                                               BackgroundColor="#E53935"
+                                               Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.DeleteNoteCommand}"
+                                               CommandParameter="{Binding .}" />
+                                </SwipeItems>
+                            </SwipeView.RightItems>
+                            <Border BackgroundColor="#252525"
+                                    Stroke="#333333"
+                                    StrokeThickness="1"
+                                    Padding="12"
+                                    StrokeShape="RoundRectangle 12"
+                                    HeightRequest="140">
+                                <Border.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenNoteCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Border.GestureRecognizers>
+                                <VerticalStackLayout Spacing="8">
+                                    <Label Text="{Binding Title}"
+                                           FontSize="16"
+                                           FontAttributes="Bold"
+                                           TextColor="#E5E5E5"
+                                           MaxLines="2"
+                                           LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding Content}"
+                                           FontSize="12"
+                                           TextColor="#8A8A8A"
+                                           MaxLines="3"
+                                           LineBreakMode="TailTruncation" />
+                                </VerticalStackLayout>
+                            </Border>
+                        </SwipeView>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- ЭКРАН 3: РЕДАКТОР -->
+            <Editor IsVisible="{Binding IsOnEditorScreen}"
+                    Text="{Binding SelectedNote.Content, Mode=TwoWay}"
+                    Placeholder="Начните печатать…"
+                    PlaceholderColor="#666666"
+                    TextColor="#E5E5E5"
+                    BackgroundColor="#252525"
+                    FontSize="14"
+                    Margin="16" />
+
+            <!-- FAB: создать папку -->
+            <Button Text="+"
+                    FontSize="28"
+                    FontAttributes="Bold"
+                    WidthRequest="56"
+                    HeightRequest="56"
+                    CornerRadius="28"
+                    BackgroundColor="#FFFFFF"
+                    TextColor="#191919"
+                    HorizontalOptions="End"
+                    VerticalOptions="End"
+                    Margin="0,0,20,20"
+                    IsVisible="{Binding IsOnFoldersScreen}"
+                    Command="{Binding CreateFolderCommand}" />
+
+            <!-- FAB: создать заметку -->
+            <Button Text="+"
+                    FontSize="28"
+                    FontAttributes="Bold"
+                    WidthRequest="56"
+                    HeightRequest="56"
+                    CornerRadius="28"
+                    BackgroundColor="#FFFFFF"
+                    TextColor="#191919"
+                    HorizontalOptions="End"
+                    VerticalOptions="End"
+                    Margin="0,0,20,20"
+                    IsVisible="{Binding IsOnNotesScreen}"
+                    Command="{Binding CreateNoteCommand}" />
+        </Grid>
+    </Grid>
+
+</ContentPage>

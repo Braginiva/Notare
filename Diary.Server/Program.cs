@@ -290,3 +290,7 @@ public class Folder
     public DateTime UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }
 }
+
+// Маркер публичной точки входа для интеграционных тестов
+// (WebApplicationFactory<Program> из Microsoft.AspNetCore.Mvc.Testing).
+public partial class Program { }

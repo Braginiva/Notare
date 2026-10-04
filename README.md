@@ -28,5 +28,26 @@
 - Soft delete (безопасное удаление)
 - Автосохранение
 
+## Тесты
+
+Интеграционные тесты сервера (xUnit + WebApplicationFactory + coverlet):
+
+```bash
+dotnet test Diary.Server.Tests
+```
+
+Либо двойной клик по `run-tests.bat` — прогон с замером покрытия,
+отчёт появится в `TestResults\*\coverage.cobertura.xml`.
+
+Особенности:
+
+- тесты поднимают настоящий сервер на **временной базе в `%TEMP%`** —
+  рабочий `diary.db` не открывается и не изменяется;
+- каждый тест получает свой экземпляр сервера и свою БД (полная изоляция);
+- покрытые эндпоинты: `/ping`, CRUD `/notes`, CRUD `/folders` с каскадом,
+  `/folders/{id}/notes`, `/sync`, `/ws` (push-уведомления), `/admin/fix-updated-at`.
+
+Текущее покрытие: **~54% строк** `Diary.Server` (27 тестов).
+
 
 

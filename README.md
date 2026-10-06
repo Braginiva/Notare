@@ -1,5 +1,9 @@
 # Notare
 
+<p align="center">
+  <img src="docs/logo.png" width="240" alt="Notare logo">
+</p>
+
 **Notare**  — персональный дневник с локальным хранением и синхронизацией между устройствами.
 
 ## Идея

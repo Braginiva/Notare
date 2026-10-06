@@ -112,7 +112,7 @@
                                 <VerticalStackLayout VerticalOptions="Center"
                                                      HorizontalOptions="Center"
                                                      Spacing="12">
-                                    <Label Text="📁" FontSize="40" HorizontalOptions="Center" />
+                                    <Image Source="folder.png" HeightRequest="44" Aspect="AspectFit" HorizontalOptions="Center" />
                                     <Label Text="{Binding Name}"
                                            FontSize="14"
                                            TextColor="#E5E5E5"

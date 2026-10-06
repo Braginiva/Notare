@@ -129,8 +129,10 @@
                                             Padding="16">
 										<StackPanel VerticalAlignment="Center"
                                                     HorizontalAlignment="Center">
-											<TextBlock Text="📁"
-                                                       FontSize="48"
+											<Image Source="/Assets/folder.png"
+                                                       Height="48"
+                                                       Width="59"
+                                                       Stretch="Uniform"
                                                        HorizontalAlignment="Center" />
 											<TextBlock Text="{Binding Name}"
                                                        FontSize="14"

@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Diary.Desktop.ViewModels"
+        xmlns:models="using:Diary.Desktop.Models"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
@@ -166,17 +167,27 @@
 				<ScrollViewer Padding="16"
                               Background="{StaticResource BrushBackgroundApp}"
                               IsVisible="{Binding IsOnNotesScreen}">
-					<ItemsControl ItemsSource="{Binding Notes}">
-						<ItemsControl.ItemsPanel>
-							<ItemsPanelTemplate>
-								<WrapPanel Orientation="Horizontal" />
-							</ItemsPanelTemplate>
-						</ItemsControl.ItemsPanel>
-
+					<ItemsControl ItemsSource="{Binding NoteGroups}">
 						<ItemsControl.ItemTemplate>
-							<DataTemplate>
-								<Button Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenNoteCommand}"
-                                        CommandParameter="{Binding}"
+							<DataTemplate x:DataType="models:NoteGroup">
+								<StackPanel Margin="0,4,0,8">
+									<TextBlock Text="{Binding Header}"
+                                           FontSize="13"
+                                           FontWeight="SemiBold"
+                                           Foreground="{StaticResource BrushTextSecondary}"
+                                           Margin="8,4,8,4" />
+
+									<ItemsControl ItemsSource="{Binding Notes}">
+										<ItemsControl.ItemsPanel>
+											<ItemsPanelTemplate>
+												<WrapPanel Orientation="Horizontal" />
+											</ItemsPanelTemplate>
+										</ItemsControl.ItemsPanel>
+
+										<ItemsControl.ItemTemplate>
+											<DataTemplate x:DataType="models:Note">
+												<Button Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).OpenNoteCommand}"
+                                                        CommandParameter="{Binding}"
                                         Width="220" Height="160"
                                         Margin="8"
                                         Padding="0"
@@ -204,9 +215,18 @@
                                                        TextWrapping="Wrap"
                                                        MaxHeight="80"
                                                        Margin="0,8,0,0" />
+											<TextBlock Text="{Binding DateLabel}"
+                                                       FontSize="11"
+                                                       Foreground="{StaticResource BrushTextSecondary}"
+                                                       HorizontalAlignment="Right"
+                                                       Margin="0,6,0,0" />
 										</StackPanel>
 									</Border>
 								</Button>
+											</DataTemplate>
+										</ItemsControl.ItemTemplate>
+									</ItemsControl>
+								</StackPanel>
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>

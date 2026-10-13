@@ -50,7 +50,9 @@ app.MapPost("/notes", async (Note note, AppDbContext db) =>
 });
 
 // PUT /notes/{id} — обновить заметку.
-app.MapPut("/notes/{id}", async (Guid id, Note updated, AppDbContext db) =>
+// Поле IsDeleted опционально: если передано — синк-клиент может восстановить
+// удалённую заметку; если нет — флаг удаления не трогаем (как раньше).
+app.MapPut("/notes/{id}", async (Guid id, NoteUpdate updated, AppDbContext db) =>
 {
     var existing = await db.Notes.FirstOrDefaultAsync(n => n.Id == id);
     if (existing is null) return Results.NotFound();
@@ -58,6 +60,10 @@ app.MapPut("/notes/{id}", async (Guid id, Note updated, AppDbContext db) =>
     existing.Title = updated.Title;
     existing.Content = updated.Content;
     existing.FolderId = updated.FolderId;
+    if (updated.IsDeleted is not null)
+    {
+        existing.IsDeleted = updated.IsDeleted.Value;
+    }
     existing.UpdatedAt = DateTime.UtcNow;
 
     await db.SaveChangesAsync();
@@ -82,6 +88,24 @@ app.MapDelete("/notes/{id}", async (Guid id, AppDbContext db) =>
     await db.SaveChangesAsync();
 
     await WebSocketHub.BroadcastChangeAsync();  // ← сообщаем всем
+
+    return Results.NoContent();
+});
+
+// POST /notes/{id}/restore — восстановить мягкую заметку (undo удаления).
+// ИДЕМПОТЕНТНО: 204 для существующей записи, 404 — только если записи нет.
+app.MapPost("/notes/{id}/restore", async (Guid id, AppDbContext db) =>
+{
+    var note = await db.Notes.FirstOrDefaultAsync(n => n.Id == id);
+    if (note is null) return Results.NotFound();
+
+    if (note.IsDeleted)
+    {
+        note.IsDeleted = false;
+        note.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await WebSocketHub.BroadcastChangeAsync();  // ← сообщаем всем
+    }
 
     return Results.NoContent();
 });
@@ -115,12 +139,17 @@ app.MapPost("/folders", async (Folder folder, AppDbContext db) =>
 });
 
 // PUT /folders/{id} — обновить имя папки.
-app.MapPut("/folders/{id}", async (Guid id, Folder updated, AppDbContext db) =>
+// Поле IsDeleted опционально — аналогично PUT /notes (восстановление через синк).
+app.MapPut("/folders/{id}", async (Guid id, FolderUpdate updated, AppDbContext db) =>
 {
     var existing = await db.Folders.FirstOrDefaultAsync(f => f.Id == id);
     if (existing is null) return Results.NotFound();
 
     existing.Name = updated.Name;
+    if (updated.IsDeleted is not null)
+    {
+        existing.IsDeleted = updated.IsDeleted.Value;
+    }
     existing.UpdatedAt = DateTime.UtcNow;
 
     await db.SaveChangesAsync();
@@ -154,6 +183,26 @@ app.MapDelete("/folders/{id}", async (Guid id, AppDbContext db) =>
     await db.SaveChangesAsync();
 
     await WebSocketHub.BroadcastChangeAsync();  // ← сообщаем всем
+
+    return Results.NoContent();
+});
+
+// POST /folders/{id}/restore — восстановить папку (undo удаления).
+// ИДЕМПОТЕНТНО. Заметки папки НЕ восстанавливаются автоматически: их
+// восстанавливает клиент отдельно (только те, что реально были в папке),
+// чтобы не оживить заметки, удалённые по отдельности.
+app.MapPost("/folders/{id}/restore", async (Guid id, AppDbContext db) =>
+{
+    var folder = await db.Folders.FirstOrDefaultAsync(f => f.Id == id);
+    if (folder is null) return Results.NotFound();
+
+    if (folder.IsDeleted)
+    {
+        folder.IsDeleted = false;
+        folder.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+        await WebSocketHub.BroadcastChangeAsync();  // ← сообщаем всем
+    }
 
     return Results.NoContent();
 });
@@ -289,6 +338,23 @@ public class Folder
 
     public DateTime UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }
+}
+
+// Тело PUT /notes/{id}: IsDeleted опционален, чтобы «отсутствие поля»
+// означало «не менять», а не «снять удаление».
+public class NoteUpdate
+{
+    public string Title { get; set; } = "";
+    public string Content { get; set; } = "";
+    public Guid? FolderId { get; set; }
+    public bool? IsDeleted { get; set; }
+}
+
+// Тело PUT /folders/{id}: та же идея с опциональным IsDeleted.
+public class FolderUpdate
+{
+    public string Name { get; set; } = "";
+    public bool? IsDeleted { get; set; }
 }
 
 // Маркер публичной точки входа для интеграционных тестов

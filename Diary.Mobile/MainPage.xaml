@@ -212,6 +212,30 @@
                     Margin="0,0,20,20"
                     IsVisible="{Binding IsOnNotesScreen}"
                     Command="{Binding CreateNoteCommand}" />
+
+            <!-- БАННЕР UNDO: «Удалено — отменить» -->
+            <Border IsVisible="{Binding IsUndoVisible}"
+                    BackgroundColor="#252525"
+                    Stroke="#8A8A8A"
+                    StrokeThickness="1"
+                    StrokeShape="RoundRectangle 10"
+                    Padding="16,10"
+                    HorizontalOptions="Center"
+                    VerticalOptions="End"
+                    Margin="0,0,0,20">
+                <HorizontalStackLayout Spacing="14">
+                    <Label Text="{Binding UndoMessage}"
+                           TextColor="#E5E5E5"
+                           VerticalOptions="Center" />
+                    <Button Text="Отменить"
+                            Command="{Binding UndoDeleteCommand}"
+                            BackgroundColor="#FFFFFF"
+                            TextColor="#191919"
+                            Padding="12,5"
+                            CornerRadius="6"
+                            FontSize="14" />
+                </HorizontalStackLayout>
+            </Border>
         </Grid>
     </Grid>
 

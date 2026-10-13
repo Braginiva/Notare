@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -36,6 +37,14 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial string CurrentTitle { get; set; } = "Главная";
+
+    // Сообщение баннера undo (пустая строка — баннер скрыт).
+    [ObservableProperty]
+    public partial string UndoMessage { get; set; } = "";
+
+    public bool IsUndoVisible => !string.IsNullOrEmpty(UndoMessage);
+
+    partial void OnUndoMessageChanged(string value) => OnPropertyChanged(nameof(IsUndoVisible));
 
     public bool IsOnMainScreen => CurrentScreen == Screen.Folders;
     public bool IsOnFoldersScreen => CurrentScreen == Screen.Folders;
@@ -334,6 +343,9 @@ public partial class MainViewModel : ViewModelBase
             Notes.Remove(note);
             Console.WriteLine("→ Заметка удалена (soft)");
 
+            // Баннер undo: 5 секунд, чтобы передумать.
+            StartUndo(new PendingUndo { Note = note });
+
             // Мгновенный синк.
             _ = TrySyncAsync();
         }
@@ -350,6 +362,11 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
+            // Заметки папки запрашиваем ДО удаления — при undo вернём их все.
+            var childNoteIds = (await _db.GetNotesByFolderAsync(folder.Id))
+                .Select(n => n.Id)
+                .ToList();
+
             await _db.DeleteFolderAsync(folder.Id);
 
             if (SelectedFolder == folder)
@@ -358,12 +375,86 @@ public partial class MainViewModel : ViewModelBase
             Folders.Remove(folder);
             Console.WriteLine("→ Папка удалена (soft)");
 
+            StartUndo(new PendingUndo { Folder = folder, ChildNoteIds = childNoteIds });
+
             // Мгновенный синк.
             _ = TrySyncAsync();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"→ ОШИБКА удаления папки: {ex.Message}");
+        }
+    }
+
+    // === UNDO УДАЛЕНИЯ ===
+
+    // Что можно отменить (всегда — только последнее удаление).
+    private sealed class PendingUndo
+    {
+        public LocalNote? Note;
+        public LocalFolder? Folder;
+        public List<Guid> ChildNoteIds = new();
+    }
+
+    private PendingUndo? _pendingUndo;
+    private int _undoToken;
+
+    // Показывает баннер «Удалено — отменить» и запускает таймер автоскрытия.
+    private void StartUndo(PendingUndo undo)
+    {
+        _pendingUndo = undo;
+        UndoMessage = undo.Note is not null
+            ? $"Заметка «{undo.Note.Title}» удалена"
+            : $"Папка «{undo.Folder!.Name}» удалена";
+
+        // Новый баннер делает таймер предыдущего «просроченным».
+        var token = ++_undoToken;
+        _ = HideUndoLaterAsync(token);
+    }
+
+    private async Task HideUndoLaterAsync(int token)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+
+        // Пока ждали, показали новый баннер — этот уже не наш.
+        if (token != _undoToken) return;
+
+        _pendingUndo = null;
+        UndoMessage = "";
+    }
+
+    [RelayCommand]
+    private async Task UndoDeleteAsync()
+    {
+        if (_pendingUndo is null) return;
+
+        var undo = _pendingUndo;
+        _pendingUndo = null;
+        _undoToken++; // таймер старого баннера больше не сработает
+        UndoMessage = "";
+
+        try
+        {
+            if (undo.Note is not null)
+            {
+                await _db.RestoreNoteAsync(undo.Note.Id);
+                Console.WriteLine("→ Удаление заметки отменено");
+            }
+            else if (undo.Folder is not null)
+            {
+                await _db.RestoreFolderAsync(undo.Folder.Id, undo.ChildNoteIds);
+                Console.WriteLine("→ Удаление папки отменено");
+            }
+
+            // Перечитываем списки — удалённое возвращается.
+            await LoadInitialDataAsync();
+
+            // И сразу на сервер: восстановление тоже нужно синкнуть.
+            _ = TrySyncAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"→ ОШИБКА отмены удаления: {ex.Message}");
         }
     }
 

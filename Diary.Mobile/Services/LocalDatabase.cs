@@ -138,6 +138,48 @@ public class LocalDatabase
         }
     }
 
+    // === ВОССТАНОВЛЕНИЕ (UNDO УДАЛЕНИЯ) ===
+
+    // Снимает пометку удаления с заметки — изменение уйдёт на сервер при синке.
+    public async Task RestoreNoteAsync(Guid id)
+    {
+        var db = await GetConnectionAsync();
+        var note = await GetNoteAsync(id);
+        if (note is null) return;
+
+        note.IsDeleted = false;
+        note.IsSynced = false;
+        note.UpdatedAt = DateTime.UtcNow;
+        await db.InsertOrReplaceAsync(note);
+    }
+
+    // Восстанавливает папку и явно перечисленные заметки — те, что были в ней
+    // на момент удаления (сервер сам их не возвращает).
+    public async Task RestoreFolderAsync(Guid id, IEnumerable<Guid> noteIds)
+    {
+        var db = await GetConnectionAsync();
+
+        var folder = await GetFolderAsync(id);
+        if (folder is not null)
+        {
+            folder.IsDeleted = false;
+            folder.IsSynced = false;
+            folder.UpdatedAt = DateTime.UtcNow;
+            await db.InsertOrReplaceAsync(folder);
+        }
+
+        foreach (var noteId in noteIds)
+        {
+            var note = await GetNoteAsync(noteId);
+            if (note is null) continue;
+
+            note.IsDeleted = false;
+            note.IsSynced = false;
+            note.UpdatedAt = DateTime.UtcNow;
+            await db.InsertOrReplaceAsync(note);
+        }
+    }
+
     // === СИНК (пока не используется) ===
 
     // Всё, что не отправлено на сервер.

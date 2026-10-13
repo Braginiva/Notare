@@ -121,6 +121,27 @@ namespace Diary.Mobile.Services
             }
         }
 
+        // === ВОССТАНОВЛЕНИЕ (UNDO) ===
+
+        // POST notes/{id}/restore — true, если заметка на сервере есть (204);
+        // false — если такой нет (404). Идемпотентно для живых заметок.
+        public async Task<bool> RestoreNoteAsync(Guid id)
+        {
+            var response = await _http.PostAsync($"notes/{id}/restore", null);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+
+        // POST folders/{id}/restore — то же для папки.
+        public async Task<bool> RestoreFolderAsync(Guid id)
+        {
+            var response = await _http.PostAsync($"folders/{id}/restore", null);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return false;
+            response.EnsureSuccessStatusCode();
+            return true;
+        }
+
         // === СИНК ===
 
         public async Task<SyncResponse?> SyncAsync(DateTime? since)

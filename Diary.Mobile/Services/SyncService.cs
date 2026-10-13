@@ -64,7 +64,9 @@ public class SyncService
                 }
                 else
                 {
-                    var existing = await _api.GetFolderAsync(folder.Id);
+                    // Проба через restore: 204 — папка есть на сервере (и мы её
+                    // только что вернули, если удаляли); 404 — создаём заново.
+                    var existsOnServer = await _api.RestoreFolderAsync(folder.Id);
                     var payload = new Folder
                     {
                         Id = folder.Id,
@@ -72,7 +74,7 @@ public class SyncService
                         CreatedAt = folder.CreatedAt
                     };
 
-                    if (existing is null)
+                    if (!existsOnServer)
                         await _api.CreateFolderAsync(payload);
                     else
                         await _api.UpdateFolderAsync(payload);
@@ -101,7 +103,9 @@ public class SyncService
                 }
                 else
                 {
-                    var existing = await _api.GetNoteAsync(note.Id);
+                    // Проба через restore: 204 — заметка есть на сервере (и мы её
+                    // только что вернули, если удаляли); 404 — создаём заново.
+                    var existsOnServer = await _api.RestoreNoteAsync(note.Id);
                     var payload = new Note
                     {
                         Id = note.Id,
@@ -111,7 +115,7 @@ public class SyncService
                         FolderId = note.FolderId
                     };
 
-                    if (existing is null)
+                    if (!existsOnServer)
                         await _api.CreateNoteAsync(payload);
                     else
                         await _api.UpdateNoteAsync(payload);

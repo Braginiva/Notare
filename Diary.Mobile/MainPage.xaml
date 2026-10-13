@@ -15,7 +15,7 @@
         </ResourceDictionary>
     </ContentPage.Resources>
 
-    <Grid RowDefinitions="Auto,*">
+    <Grid RowDefinitions="Auto,Auto,*">
 
         <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
         <Grid Grid.Row="0"
@@ -74,8 +74,20 @@
                     Clicked="OnMenuClicked" />
         </Grid>
 
+        <!-- ПОИСК -->
+        <SearchBar Grid.Row="1"
+                   Text="{Binding SearchQuery, Mode=TwoWay}"
+                   Placeholder="Поиск…"
+                   IsVisible="{Binding IsSearchVisible}"
+                   BackgroundColor="#252525"
+                   TextColor="#E5E5E5"
+                   PlaceholderColor="#8A8A8A"
+                   CancelButtonColor="#8A8A8A"
+                   HeightRequest="42"
+                   Margin="16,8" />
+
         <!-- КОНТЕНТ -->
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="2">
 
             <!-- ЭКРАН 1: ПАПКИ -->
             <CollectionView IsVisible="{Binding IsOnFoldersScreen}"

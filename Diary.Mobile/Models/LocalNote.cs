@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using SQLite;
 
@@ -25,6 +26,21 @@ public partial class LocalNote : ObservableObject
     public Guid? FolderId { get; set; }
     public bool IsDeleted { get; set; }
     public bool IsSynced { get; set; }
+
+    // Подпись даты на карточке: только время для сегодняшних заметок,
+    // иначе — дата и время («5 окт 14:30»).
+    // CreatedAt хранится в UTC (так его пишут клиенты); Kind после чтения из
+    // SQLite теряется — восстанавливаем перед переводом в локальное время.
+    [Ignore]
+    public string DateLabel
+    {
+        get
+        {
+            var local = DateTime.SpecifyKind(CreatedAt, DateTimeKind.Utc).ToLocalTime();
+            var format = local.Date == DateTime.Today ? "HH:mm" : "d MMM HH:mm";
+            return local.ToString(format, new CultureInfo("ru-RU"));
+        }
+    }
 
     public LocalNote()
     {

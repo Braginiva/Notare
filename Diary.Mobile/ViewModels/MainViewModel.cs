@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Maui.Networking;
@@ -29,6 +30,9 @@ public partial class MainViewModel : ViewModelBase
 
     public ObservableCollection<LocalFolder> Folders { get; } = new();
     public ObservableCollection<LocalNote> Notes { get; } = new();
+
+    // Заметки, сгруппированные по датам (для списка на экране заметок).
+    public ObservableCollection<NoteGroup> NoteGroups { get; } = new();
 
     [ObservableProperty]
     public partial Screen CurrentScreen { get; set; } = Screen.Folders;
@@ -83,12 +87,47 @@ public partial class MainViewModel : ViewModelBase
         Notes.Clear();
         foreach (var note in _allNotes.Where(n => Matches(n.Title) || Matches(n.Content)))
             Notes.Add(note);
+
+        RebuildGroups();
     }
 
     // Пустой запрос пропускает всё; иначе — регистронезависимое вхождение.
     private bool Matches(string? text) =>
         string.IsNullOrWhiteSpace(SearchQuery)
         || (text?.Contains(SearchQuery.Trim(), StringComparison.OrdinalIgnoreCase) ?? false);
+
+    // === ГРУППЫ ПО ДАТАМ ===
+
+    // Строит группы заметок по дате создания: новые группы сверху,
+    // внутри группы — заметки по убыванию даты.
+    private void RebuildGroups()
+    {
+        NoteGroups.Clear();
+
+        foreach (var group in Notes
+            .GroupBy(n => UtcToLocal(n.CreatedAt).Date)
+            .OrderByDescending(g => g.Key))
+        {
+            NoteGroups.Add(new NoteGroup(
+                DateHeader(group.Key),
+                group.OrderByDescending(n => n.CreatedAt).ToList()));
+        }
+    }
+
+    // CreatedAt хранится в UTC (Kind теряется при чтении из SQLite).
+    private static DateTime UtcToLocal(DateTime value) =>
+        DateTime.SpecifyKind(value, DateTimeKind.Utc).ToLocalTime();
+
+    // «Сегодня» / «Вчера» / «5 октября 2026».
+    private static string DateHeader(DateTime date)
+    {
+        var today = DateTime.Today;
+        if (date == today) return "Сегодня";
+        if (date == today.AddDays(-1)) return "Вчера";
+        return date.ToString("d MMMM yyyy", RuCulture);
+    }
+
+    private static readonly CultureInfo RuCulture = new("ru-RU");
 
     public MainViewModel(LocalDatabase db, SyncService sync)
     {

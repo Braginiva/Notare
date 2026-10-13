@@ -135,16 +135,23 @@
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <!-- ЭКРАН 2: ЗАМЕТКИ -->
+            <!-- ЭКРАН 2: ЗАМЕТКИ (группы по датам) -->
             <CollectionView IsVisible="{Binding IsOnNotesScreen}"
-                            ItemsSource="{Binding Notes}"
+                            ItemsSource="{Binding NoteGroups}"
+                            IsGrouped="True"
                             SelectionMode="None">
                 <CollectionView.ItemsLayout>
-                    <GridItemsLayout Orientation="Vertical"
-                                     Span="2"
-                                     HorizontalItemSpacing="12"
-                                     VerticalItemSpacing="12" />
+                    <LinearItemsLayout Orientation="Vertical" />
                 </CollectionView.ItemsLayout>
+                <CollectionView.GroupHeaderTemplate>
+                    <DataTemplate x:DataType="models:NoteGroup">
+                        <Label Text="{Binding Header}"
+                               FontSize="13"
+                               FontAttributes="Bold"
+                               TextColor="#8A8A8A"
+                               Margin="16,12,16,4" />
+                    </DataTemplate>
+                </CollectionView.GroupHeaderTemplate>
                 <CollectionView.ItemTemplate>
                     <DataTemplate x:DataType="models:LocalNote">
                         <SwipeView>
@@ -178,6 +185,10 @@
                                            TextColor="#8A8A8A"
                                            MaxLines="3"
                                            LineBreakMode="TailTruncation" />
+                                    <Label Text="{Binding DateLabel}"
+                                           FontSize="11"
+                                           TextColor="#8A8A8A"
+                                           HorizontalTextAlignment="End" />
                                 </VerticalStackLayout>
                             </Border>
                         </SwipeView>

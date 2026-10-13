@@ -81,5 +81,21 @@ namespace Diary.Desktop.Services
             var response = await _http.DeleteAsync($"/folders/{id}");
             response.EnsureSuccessStatusCode();
         }
+
+        // === ВОССТАНОВЛЕНИЕ (UNDO УДАЛЕНИЯ) ===
+
+        // POST /notes/{id}/restore — вернуть удалённую заметку.
+        public async Task RestoreNoteAsync(Guid id)
+        {
+            var response = await _http.PostAsync($"/notes/{id}/restore", null);
+            response.EnsureSuccessStatusCode();
+        }
+
+        // POST /folders/{id}/restore — вернуть удалённую папку.
+        public async Task RestoreFolderAsync(Guid id)
+        {
+            var response = await _http.PostAsync($"/folders/{id}/restore", null);
+            response.EnsureSuccessStatusCode();
+        }
     }
 }

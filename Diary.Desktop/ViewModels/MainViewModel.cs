@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Linq;
@@ -44,6 +45,14 @@ public partial class MainViewModel : ViewModelBase
 
     [ObservableProperty]
     public partial string CurrentTitle { get; set; } = "Главная";
+
+    // Сообщение баннера undo (пустая строка — баннер скрыт).
+    [ObservableProperty]
+    public partial string UndoMessage { get; set; } = "";
+
+    public bool IsUndoVisible => !string.IsNullOrEmpty(UndoMessage);
+
+    partial void OnUndoMessageChanged(string value) => OnPropertyChanged(nameof(IsUndoVisible));
 
     public bool IsOnMainScreen => CurrentScreen == Screen.Folders;
     public bool IsOnFoldersScreen => CurrentScreen == Screen.Folders;
@@ -328,6 +337,9 @@ public partial class MainViewModel : ViewModelBase
 
             Notes.Remove(note);
             Debug.WriteLine("→ Заметка удалена");
+
+            // Даём возможность отменить удаление (баннер на 5 секунд).
+            StartUndo(new PendingUndo { Note = note });
         }
         catch (Exception ex)
         {
@@ -349,10 +361,93 @@ public partial class MainViewModel : ViewModelBase
 
             Folders.Remove(folder);
             Debug.WriteLine("→ Папка удалена");
+
+            // Запоминаем заметки папки: при undo восстановим и их тоже
+            // (сервер папке их не возвращает — только сам клиент явно).
+            var childNoteIds = Notes
+                .Where(n => n.FolderId == folder.Id)
+                .Select(n => n.Id)
+                .ToList();
+
+            StartUndo(new PendingUndo { Folder = folder, ChildNoteIds = childNoteIds });
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"→ ОШИБКА удаления папки: {ex.Message}");
+        }
+    }
+
+    // === UNDO УДАЛЕНИЯ ===
+
+    // Что можно отменить (всегда — только последнее удаление).
+    private sealed class PendingUndo
+    {
+        public Note? Note;
+        public Folder? Folder;
+        public List<Guid> ChildNoteIds = new();
+    }
+
+    private PendingUndo? _pendingUndo;
+    private int _undoToken;
+
+    // Показывает баннер «Удалено — отменить» и запускает таймер автоскрытия.
+    private void StartUndo(PendingUndo undo)
+    {
+        _pendingUndo = undo;
+        UndoMessage = undo.Note is not null
+            ? $"Заметка «{undo.Note.Title}» удалена"
+            : $"Папка «{undo.Folder!.Name}» удалена";
+
+        // Новый баннер делает таймер предыдущего «просроченным».
+        var token = ++_undoToken;
+        _ = HideUndoLaterAsync(token);
+    }
+
+    private async Task HideUndoLaterAsync(int token)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5));
+
+        // Пока ждали, показали новый баннер — этот уже не наш.
+        if (token != _undoToken) return;
+
+        _pendingUndo = null;
+        UndoMessage = "";
+    }
+
+    [RelayCommand]
+    private async Task UndoDeleteAsync()
+    {
+        if (_pendingUndo is null) return;
+
+        var undo = _pendingUndo;
+        _pendingUndo = null;
+        _undoToken++; // таймер старого баннера больше не сработает
+        UndoMessage = "";
+
+        try
+        {
+            if (undo.Note is not null)
+            {
+                await _api.RestoreNoteAsync(undo.Note.Id);
+                Debug.WriteLine("→ Удаление заметки отменено");
+            }
+            else if (undo.Folder is not null)
+            {
+                await _api.RestoreFolderAsync(undo.Folder.Id);
+
+                // Заметки папки восстанавливаем по-отдельности.
+                foreach (var noteId in undo.ChildNoteIds)
+                    await _api.RestoreNoteAsync(noteId);
+
+                Debug.WriteLine("→ Удаление папки отменено");
+            }
+
+            // Перечитываем данные: удалённое вернётся в списки.
+            await LoadInitialDataAsync();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"→ ОШИБКА отмены удаления: {ex.Message}");
         }
     }
 

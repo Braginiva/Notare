@@ -17,6 +17,10 @@ public partial class MainViewModel : ViewModelBase
     private readonly ApiClient _api;
     private readonly WebSocketClient _ws;
 
+    // Полные списки (до фильтра поиска) — из них строим видимые Folders/Notes.
+    private readonly List<Folder> _allFolders = new();
+    private readonly List<Note> _allNotes = new();
+
     // Таймеры автосохранения (debounce): один на заметки, один на папки.
     private DispatcherTimer? _noteTimer;
     private DispatcherTimer? _folderTimer;
@@ -54,10 +58,17 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnUndoMessageChanged(string value) => OnPropertyChanged(nameof(IsUndoVisible));
 
+    // Текст поиска: фильтрует папки на главной и заметки в папке.
+    [ObservableProperty]
+    public partial string SearchQuery { get; set; } = "";
+
+    partial void OnSearchQueryChanged(string value) => ApplyFilter();
+
     public bool IsOnMainScreen => CurrentScreen == Screen.Folders;
     public bool IsOnFoldersScreen => CurrentScreen == Screen.Folders;
     public bool IsOnNotesScreen => CurrentScreen == Screen.Notes;
     public bool IsOnEditorScreen => CurrentScreen == Screen.Editor;
+    public bool IsSearchVisible => CurrentScreen != Screen.Editor;
 
     partial void OnCurrentScreenChanged(Screen value)
     {
@@ -65,7 +76,27 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsOnFoldersScreen));
         OnPropertyChanged(nameof(IsOnNotesScreen));
         OnPropertyChanged(nameof(IsOnEditorScreen));
+        OnPropertyChanged(nameof(IsSearchVisible));
     }
+
+    // === ПОИСК ===
+
+    // Пересобирает видимые списки Folders/Notes из полных данных с учётом запроса.
+    private void ApplyFilter()
+    {
+        Folders.Clear();
+        foreach (var folder in _allFolders.Where(f => Matches(f.Name)))
+            Folders.Add(folder);
+
+        Notes.Clear();
+        foreach (var note in _allNotes.Where(n => Matches(n.Title) || Matches(n.Content)))
+            Notes.Add(note);
+    }
+
+    // Пустой запрос пропускает всё; иначе — регистронезависимое вхождение.
+    private bool Matches(string? text) =>
+        string.IsNullOrWhiteSpace(SearchQuery)
+        || (text?.Contains(SearchQuery.Trim(), StringComparison.OrdinalIgnoreCase) ?? false);
 
     public MainViewModel()
     {
@@ -123,6 +154,7 @@ public partial class MainViewModel : ViewModelBase
     {
         if (folder is null) return;
 
+        SearchQuery = ""; // при входе в папку сбрасываем поиск
         SelectedFolder = folder;
         CurrentTitle = folder.Name;
         CurrentScreen = Screen.Notes;
@@ -138,7 +170,9 @@ public partial class MainViewModel : ViewModelBase
                 CurrentScreen = Screen.Folders;
                 SelectedFolder = null;
                 CurrentTitle = "Главная";
-                Notes.Clear();
+                SearchQuery = ""; // возврат на главную — сбрасываем поиск
+                _allNotes.Clear();
+                ApplyFilter();
                 break;
 
             case Screen.Editor:
@@ -172,10 +206,9 @@ public partial class MainViewModel : ViewModelBase
             // Папки загружаем всегда — они нужны на главном экране.
             Debug.WriteLine("→ Загружаю папки с сервера");
             var folders = await _api.GetFoldersAsync();
-            Folders.Clear();
-            foreach (var folder in folders)
-                Folders.Add(folder);
-            Debug.WriteLine($"→ Загружено папок: {Folders.Count}");
+            _allFolders.Clear();
+            _allFolders.AddRange(folders);
+            Debug.WriteLine($"→ Загружено папок: {_allFolders.Count}");
 
             // Заметки загружаем ПО КОНТЕКСТУ экрана.
             if (CurrentScreen == Screen.Folders)
@@ -183,21 +216,18 @@ public partial class MainViewModel : ViewModelBase
                 // На главной — все заметки (для превью, если понадобится).
                 Debug.WriteLine("→ Загружаю все заметки (экран папок)");
                 var notes = await _api.GetNotesAsync();
-                Notes.Clear();
-                foreach (var note in notes)
-                    Notes.Add(note);
-                Debug.WriteLine($"→ Загружено заметок: {Notes.Count}");
+                _allNotes.Clear();
+                _allNotes.AddRange(notes);
+                Debug.WriteLine($"→ Загружено заметок: {_allNotes.Count}");
             }
             else if (CurrentScreen == Screen.Notes && SelectedFolder is not null)
             {
                 // На экране заметок в папке — только заметки этой папки.
                 Debug.WriteLine($"→ Загружаю заметки папки {SelectedFolder.Name}");
                 var notes = await _api.GetNotesAsync();
-                var filtered = notes.Where(n => n.FolderId == SelectedFolder.Id).ToList();
-                Notes.Clear();
-                foreach (var note in filtered)
-                    Notes.Add(note);
-                Debug.WriteLine($"→ Заметок в папке: {Notes.Count}");
+                _allNotes.Clear();
+                _allNotes.AddRange(notes.Where(n => n.FolderId == SelectedFolder.Id));
+                Debug.WriteLine($"→ Заметок в папке: {_allNotes.Count}");
             }
             else if (CurrentScreen == Screen.Editor)
             {
@@ -205,12 +235,15 @@ public partial class MainViewModel : ViewModelBase
                 Debug.WriteLine("→ Экран редактора, список заметок не трогаю");
             }
 
-            // Восстанавливаем выделение по Id.
+            // Строим видимые списки с учётом поискового запроса.
+            ApplyFilter();
+
+            // Восстанавливаем выделение по Id (независимо от фильтра).
             if (keepFolderId.HasValue)
-                SelectedFolder = Folders.FirstOrDefault(f => f.Id == keepFolderId.Value);
+                SelectedFolder = _allFolders.FirstOrDefault(f => f.Id == keepFolderId.Value);
 
             if (keepNoteId.HasValue)
-                SelectedNote = Notes.FirstOrDefault(n => n.Id == keepNoteId.Value);
+                SelectedNote = _allNotes.FirstOrDefault(n => n.Id == keepNoteId.Value);
         }
         catch (Exception ex)
         {
@@ -223,13 +256,13 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             var notes = await _api.GetNotesAsync();
-            var filtered = notes.Where(n => n.FolderId == folderId).ToList();
 
-            Notes.Clear();
-            foreach (var note in filtered)
-                Notes.Add(note);
+            _allNotes.Clear();
+            _allNotes.AddRange(notes.Where(n => n.FolderId == folderId));
 
-            Debug.WriteLine($"→ Заметок в папке: {Notes.Count}");
+            ApplyFilter();
+
+            Debug.WriteLine($"→ Заметок в папке: {_allNotes.Count}");
         }
         catch (Exception ex)
         {
@@ -272,7 +305,8 @@ public partial class MainViewModel : ViewModelBase
             var created = await _api.CreateNoteAsync(newNote);
             if (created is null) return;
 
-            Notes.Insert(0, created);
+            _allNotes.Insert(0, created);
+            ApplyFilter();
             SelectedNote = created;
             CurrentTitle = created.Title;
             CurrentScreen = Screen.Editor;
@@ -299,7 +333,8 @@ public partial class MainViewModel : ViewModelBase
             var created = await _api.CreateFolderAsync(newFolder);
             if (created is null) return;
 
-            Folders.Insert(0, created);
+            _allFolders.Insert(0, created);
+            ApplyFilter();
             Debug.WriteLine("→ Папка создана");
         }
         catch (Exception ex)
@@ -335,7 +370,8 @@ public partial class MainViewModel : ViewModelBase
                     GoBack();
             }
 
-            Notes.Remove(note);
+            _allNotes.Remove(note);
+            ApplyFilter();
             Debug.WriteLine("→ Заметка удалена");
 
             // Даём возможность отменить удаление (баннер на 5 секунд).
@@ -359,12 +395,13 @@ public partial class MainViewModel : ViewModelBase
             if (SelectedFolder == folder)
                 SelectedFolder = null;
 
-            Folders.Remove(folder);
+            _allFolders.Remove(folder);
+            ApplyFilter();
             Debug.WriteLine("→ Папка удалена");
 
             // Запоминаем заметки папки: при undo восстановим и их тоже
             // (сервер папке их не возвращает — только сам клиент явно).
-            var childNoteIds = Notes
+            var childNoteIds = _allNotes
                 .Where(n => n.FolderId == folder.Id)
                 .Select(n => n.Id)
                 .ToList();

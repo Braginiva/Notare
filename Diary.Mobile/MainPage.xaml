@@ -94,8 +94,7 @@
                                 <SwipeItems Mode="Execute">
                                     <SwipeItem Text="Удалить"
                                                BackgroundColor="#E53935"
-                                               Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.DeleteFolderCommand}"
-                                               CommandParameter="{Binding .}" />
+                                               Clicked="OnDeleteFolderClicked" />
                                 </SwipeItems>
                             </SwipeView.RightItems>
                             <Border BackgroundColor="#252525"
@@ -141,8 +140,7 @@
                                 <SwipeItems Mode="Execute">
                                     <SwipeItem Text="Удалить"
                                                BackgroundColor="#E53935"
-                                               Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.DeleteNoteCommand}"
-                                               CommandParameter="{Binding .}" />
+                                               Clicked="OnDeleteNoteClicked" />
                                 </SwipeItems>
                             </SwipeView.RightItems>
                             <Border BackgroundColor="#252525"

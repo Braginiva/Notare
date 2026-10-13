@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Diary.Desktop.Views.ConfirmDialog"
+        Title="Подтверждение"
+        SizeToContent="Height"
+        Width="420"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{StaticResource BrushBackgroundPanel}">
+	<StackPanel Margin="20" Spacing="4">
+		<TextBlock x:Name="TitleText"
+		           FontSize="16"
+		           FontWeight="Bold"
+		           Foreground="{StaticResource BrushTextPrimary}" />
+		<TextBlock x:Name="MessageText"
+		           FontSize="13"
+		           TextWrapping="Wrap"
+		           Foreground="{StaticResource BrushTextSecondary}"
+		           Margin="0,4,0,0" />
+		<StackPanel Orientation="Horizontal"
+		            HorizontalAlignment="Right"
+		            Spacing="8"
+		            Margin="0,16,0,0">
+			<Button Content="Отмена"
+			        MinWidth="90"
+			        IsCancel="True"
+			        Click="OnCancel" />
+			<Button Content="Удалить"
+			        MinWidth="90"
+			        Background="#E53935"
+			        Foreground="White"
+			        Click="OnConfirm" />
+		</StackPanel>
+	</StackPanel>
+</Window>

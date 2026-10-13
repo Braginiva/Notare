@@ -119,8 +119,7 @@
 									<Button.ContextMenu>
 										<ContextMenu>
 											<MenuItem Header="Удалить"
-                                                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteFolderCommand}"
-                                                      CommandParameter="{Binding}" />
+                                                      Click="OnDeleteFolderClick" />
 										</ContextMenu>
 									</Button.ContextMenu>
 
@@ -171,8 +170,7 @@
 									<Button.ContextMenu>
 										<ContextMenu>
 											<MenuItem Header="Удалить"
-                                                      Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteNoteCommand}"
-                                                      CommandParameter="{Binding}" />
+                                                      Click="OnDeleteNoteClick" />
 										</ContextMenu>
 									</Button.ContextMenu>
 

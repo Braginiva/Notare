@@ -13,6 +13,23 @@ public partial class MainWindow : Window
         InitializeComponent();
     }
 
+    // Разрешает полный выход — выставляется из меню трея («Выход»).
+    public bool AllowExit { get; set; }
+
+    // Крестик — не выход, а сворачивание в трей.
+    // Приложение живёт, пока пользователь не выберет «Выход» в трее.
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        if (!AllowExit)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
+        base.OnClosing(e);
+    }
+
     private MainViewModel? ViewModel => DataContext as MainViewModel;
 
     // Правый клик → «Удалить»: спрашиваем подтверждение, потом выполняем команду VM.

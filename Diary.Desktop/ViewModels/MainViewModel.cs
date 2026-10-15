@@ -62,6 +62,14 @@ public partial class MainViewModel : ViewModelBase
 
     partial void OnUndoMessageChanged(string value) => OnPropertyChanged(nameof(IsUndoVisible));
 
+    // Сообщение ошибки «сервер не запустился» (пустая строка — баннер скрыт).
+    [ObservableProperty]
+    public partial string ServerError { get; set; } = "";
+
+    public bool IsServerErrorVisible => !string.IsNullOrEmpty(ServerError);
+
+    partial void OnServerErrorChanged(string value) => OnPropertyChanged(nameof(IsServerErrorVisible));
+
     // Текст поиска: фильтрует папки на главной и заметки в папке.
     [ObservableProperty]
     public partial string SearchQuery { get; set; } = "";
@@ -154,7 +162,7 @@ public partial class MainViewModel : ViewModelBase
         };
 
         // Таймер автосинка: раз в 30 сек.
-        // WebSocket для мгновенного синка.
+        // WebSocket для мгновенного синка (стартует после подъёма сервера).
         _ws = new WebSocketClient(
             "ws://localhost:5092/ws",
             onChange: () =>
@@ -167,8 +175,6 @@ public partial class MainViewModel : ViewModelBase
                     await LoadInitialDataAsync();
                 });
             });
-        _ws.Start();
-        Debug.WriteLine("### WebSocket-клиент запущен");
 
         // Автосинк раз в 5 минут как страховка на случай обрыва WebSocket.
         _autoSyncTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
@@ -179,7 +185,40 @@ public partial class MainViewModel : ViewModelBase
         _autoSyncTimer.Start();
         Debug.WriteLine("### Автосинк-страховка запущен (5 мин)");
 
-        _ = LoadInitialDataAsync();
+        _ = StartServicesAsync();
+    }
+
+    // === СТАРТ СЕРВИСОВ ===
+
+    // Порядок важен: сначала поднимаем сервер (если нужно), потом WS и загрузка.
+    // Вызывается из конструктора как fire-and-forget — окно показывается сразу,
+    // ожидание сервера идёт в фоне.
+    private async Task StartServicesAsync()
+    {
+        var started = await ServerLauncher.EnsureStartedAsync();
+
+        if (!started)
+        {
+            ServerError = "Сервер синхронизации не запустился. Заметки будут только на этом " +
+                          "компьютере, телефон их не увидит. Нажмите «Повторить».";
+        }
+
+        // WS сам переподключается каждые 5 секунд — запускаем в любом случае.
+        _ws.Start();
+        Debug.WriteLine("### WebSocket-клиент запущен");
+
+        await LoadInitialDataAsync();
+    }
+
+    // Кнопка «Повторить» на баннере ошибки сервера.
+    [RelayCommand]
+    private async Task RetryServerAsync()
+    {
+        if (await ServerLauncher.EnsureStartedAsync())
+        {
+            ServerError = "";
+            await LoadInitialDataAsync();
+        }
     }
 
     // === НАВИГАЦИЯ ===

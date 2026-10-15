@@ -112,6 +112,35 @@
 			<!-- КОНТЕНТ -->
 			<Grid Grid.Row="2">
 
+				<!-- БАННЕР: сервер не запустился -->
+				<Border IsVisible="{Binding IsServerErrorVisible}"
+                        Background="{StaticResource BrushBackgroundCard}"
+                        BorderBrush="{StaticResource BrushAccent}"
+                        BorderThickness="1"
+                        CornerRadius="10"
+                        Padding="16,10"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Top"
+                        Margin="16,8"
+                        ZIndex="15">
+					<Grid ColumnDefinitions="*,Auto">
+						<TextBlock Grid.Column="0"
+                                   Text="{Binding ServerError}"
+                                   Foreground="{StaticResource BrushTextPrimary}"
+                                   FontSize="13"
+                                   TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+						<Button Grid.Column="1"
+                                Content="Повторить"
+                                Command="{Binding RetryServerCommand}"
+                                Background="{StaticResource BrushAccent}"
+                                Foreground="{StaticResource BrushAccentText}"
+                                Padding="12,5"
+                                CornerRadius="6"
+                                Margin="14,0,0,0" />
+					</Grid>
+				</Border>
+
 				<!-- ЭКРАН 1: ПАПКИ -->
 				<ScrollViewer Padding="16"
                               Background="{StaticResource BrushBackgroundApp}"

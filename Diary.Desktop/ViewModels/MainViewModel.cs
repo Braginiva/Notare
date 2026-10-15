@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -219,6 +220,63 @@ public partial class MainViewModel : ViewModelBase
             ServerError = "";
             await LoadInitialDataAsync();
         }
+    }
+
+    // === АВТОЗАПУСК С WINDOWS ===
+
+    private static string AutoStartShortcutPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Startup),
+        "Notare.lnk");
+
+    // Состояние пункта меню ⋮: есть ли ярлык в папке автозагрузки.
+    public bool IsAutoStart => File.Exists(AutoStartShortcutPath);
+
+    // Заголовок пункта меню с визуальной галочкой.
+    public string AutoStartHeader => IsAutoStart ? "✓ Запускать с Windows" : "Запускать с Windows";
+
+    [RelayCommand]
+    private void ToggleAutoStart()
+    {
+        try
+        {
+            if (File.Exists(AutoStartShortcutPath))
+            {
+                File.Delete(AutoStartShortcutPath);
+                Debug.WriteLine("→ Автозапуск выключен");
+            }
+            else
+            {
+                CreateAutoStartShortcut();
+                Debug.WriteLine("→ Автозапуск включён");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"→ ОШИБКА автозапуска: {ex.Message}");
+        }
+
+        OnPropertyChanged(nameof(IsAutoStart));
+        OnPropertyChanged(nameof(AutoStartHeader));
+    }
+
+    // Ярлык в папку автозагрузки через WScript.Shell (без прав администратора).
+    private static void CreateAutoStartShortcut()
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Автозапуск поддерживается только на Windows");
+
+        var exePath = Environment.ProcessPath
+            ?? throw new InvalidOperationException("Не удалось определить путь к exe");
+
+        var shellType = Type.GetTypeFromProgID("WScript.Shell")
+            ?? throw new InvalidOperationException("WScript.Shell недоступен");
+
+        dynamic shell = Activator.CreateInstance(shellType)!;
+        dynamic shortcut = shell.CreateShortcut(AutoStartShortcutPath);
+        shortcut.TargetPath = exePath;
+        shortcut.WorkingDirectory = Path.GetDirectoryName(exePath);
+        shortcut.Description = "Notare — персональный дневник";
+        shortcut.Save();
     }
 
     // === НАВИГАЦИЯ ===

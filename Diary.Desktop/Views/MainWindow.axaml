@@ -88,6 +88,8 @@
 							<MenuFlyout>
 								<MenuItem Header="Обновить данные"
 										  Command="{Binding RefreshCommand}" />
+								<MenuItem Header="{Binding AutoStartHeader}"
+										  Command="{Binding ToggleAutoStartCommand}" />
 							</MenuFlyout>
 						</Button.Flyout>
 					</Button>

@@ -196,6 +196,9 @@ public partial class MainViewModel : ViewModelBase
     // ожидание сервера идёт в фоне.
     private async Task StartServicesAsync()
     {
+        // Первый запуск: ярлык на рабочем столе, чтобы было откуда запускать.
+        EnsureDesktopShortcutOnFirstRun();
+
         var started = await ServerLauncher.EnsureStartedAsync();
 
         if (!started)
@@ -222,48 +225,94 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    // === АВТОЗАПУСК С WINDOWS ===
+    // === ЯРЛЫКИ (автозапуск с Windows и рабочий стол) ===
 
     private static string AutoStartShortcutPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.Startup),
         "Notare.lnk");
 
-    // Состояние пункта меню ⋮: есть ли ярлык в папке автозагрузки.
-    public bool IsAutoStart => File.Exists(AutoStartShortcutPath);
+    private static string DesktopShortcutPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+        "Дневник.lnk");
 
-    // Заголовок пункта меню с визуальной галочкой.
+    // Маркер первого запуска: ярлык на рабочем столе создаём только один раз,
+    // дальше пользователь сам управляет пунктом меню.
+    private static string FirstRunMarkerPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Notare", "first-run.marker");
+
+    // Состояния пунктов меню ⋮: есть ли соответствующие ярлыки.
+    public bool IsAutoStart => File.Exists(AutoStartShortcutPath);
+    public bool IsDesktopShortcut => File.Exists(DesktopShortcutPath);
+
+    // Заголовки пунктов меню с визуальной галочкой.
     public string AutoStartHeader => IsAutoStart ? "✓ Запускать с Windows" : "Запускать с Windows";
+    public string DesktopShortcutHeader => IsDesktopShortcut ? "✓ Ярлык на рабочем столе" : "Ярлык на рабочем столе";
 
     [RelayCommand]
-    private void ToggleAutoStart()
+    private void ToggleAutoStart() => ToggleShortcutFile(
+        AutoStartShortcutPath, "Notare — персональный дневник");
+
+    [RelayCommand]
+    private void ToggleDesktopShortcut() => ToggleShortcutFile(
+        DesktopShortcutPath, "Дневник — персональный дневник");
+
+    // Общий переключатель: есть ярлык — удаляем, нет — создаём.
+    private void ToggleShortcutFile(string shortcutPath, string description)
     {
         try
         {
-            if (File.Exists(AutoStartShortcutPath))
+            if (File.Exists(shortcutPath))
             {
-                File.Delete(AutoStartShortcutPath);
-                Debug.WriteLine("→ Автозапуск выключен");
+                File.Delete(shortcutPath);
+                Debug.WriteLine($"→ Ярлык удалён: {shortcutPath}");
             }
             else
             {
-                CreateAutoStartShortcut();
-                Debug.WriteLine("→ Автозапуск включён");
+                CreateShortcut(shortcutPath, description);
+                Debug.WriteLine($"→ Ярлык создан: {shortcutPath}");
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"→ ОШИБКА автозапуска: {ex.Message}");
+            Debug.WriteLine($"→ ОШИБКА ярлыка: {ex.Message}");
         }
 
+        // Оба пункта зависят от наличия файлов — обновляем оба заголовка.
         OnPropertyChanged(nameof(IsAutoStart));
         OnPropertyChanged(nameof(AutoStartHeader));
+        OnPropertyChanged(nameof(IsDesktopShortcut));
+        OnPropertyChanged(nameof(DesktopShortcutHeader));
     }
 
-    // Ярлык в папку автозагрузки через WScript.Shell (без прав администратора).
-    private static void CreateAutoStartShortcut()
+    // При первом запуске: кладём ярлык «Дневник» на рабочий стол, чтобы было
+    // откуда запускать. Маркер в %AppData% — чтобы после удаления не появлялся снова.
+    public void EnsureDesktopShortcutOnFirstRun()
+    {
+        try
+        {
+            if (File.Exists(FirstRunMarkerPath)) return;
+
+            Directory.CreateDirectory(Path.GetDirectoryName(FirstRunMarkerPath)!);
+            File.WriteAllText(FirstRunMarkerPath, DateTime.UtcNow.ToString("O"));
+
+            if (!File.Exists(DesktopShortcutPath))
+            {
+                CreateShortcut(DesktopShortcutPath, "Дневник — персональный дневник");
+                Debug.WriteLine("→ Первый запуск: создан ярлык на рабочем столе");
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"→ ОШИБКА ярлыка (первый запуск): {ex.Message}");
+        }
+    }
+
+    // Ярлык через WScript.Shell (без прав администратора).
+    private static void CreateShortcut(string shortcutPath, string description)
     {
         if (!OperatingSystem.IsWindows())
-            throw new PlatformNotSupportedException("Автозапуск поддерживается только на Windows");
+            throw new PlatformNotSupportedException("Ярлыки поддерживаются только на Windows");
 
         var exePath = Environment.ProcessPath
             ?? throw new InvalidOperationException("Не удалось определить путь к exe");
@@ -272,10 +321,10 @@ public partial class MainViewModel : ViewModelBase
             ?? throw new InvalidOperationException("WScript.Shell недоступен");
 
         dynamic shell = Activator.CreateInstance(shellType)!;
-        dynamic shortcut = shell.CreateShortcut(AutoStartShortcutPath);
+        dynamic shortcut = shell.CreateShortcut(shortcutPath);
         shortcut.TargetPath = exePath;
         shortcut.WorkingDirectory = Path.GetDirectoryName(exePath);
-        shortcut.Description = "Notare — персональный дневник";
+        shortcut.Description = description;
         shortcut.Save();
     }
 

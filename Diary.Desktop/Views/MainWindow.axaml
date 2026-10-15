@@ -90,6 +90,8 @@
 										  Command="{Binding RefreshCommand}" />
 								<MenuItem Header="{Binding AutoStartHeader}"
 										  Command="{Binding ToggleAutoStartCommand}" />
+								<MenuItem Header="{Binding DesktopShortcutHeader}"
+										  Command="{Binding ToggleDesktopShortcutCommand}" />
 							</MenuFlyout>
 						</Button.Flyout>
 					</Button>

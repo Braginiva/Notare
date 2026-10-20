@@ -69,7 +69,7 @@ public class WebSocketClient
                                 WebSocketCloseStatus.NormalClosure,
                                 "bye",
                                 ct);
-                            return;
+                            break; // выходим из приёма и переподключаемся ниже
                         }
 
                         sb.Append(Encoding.UTF8.GetString(buffer, 0, result.Count));

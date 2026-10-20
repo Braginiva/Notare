@@ -394,6 +394,60 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ThemeSystemHeader));
     }
 
+    // Экспорт всех папок и заметок в JSON-файл (бэкап).
+    [RelayCommand]
+    private async Task ExportAsync()
+    {
+        try
+        {
+            var folders = await _api.GetFoldersAsync();
+            var notes = await _api.GetNotesAsync();
+
+            var payload = new
+            {
+                app = "Notare",
+                exportedAt = DateTime.Now,
+                folders,
+                notes,
+            };
+            var json = JsonSerializer.Serialize(
+                payload, new JsonSerializerOptions { WriteIndented = true });
+
+            if (Application.Current?.ApplicationLifetime
+                    is not IClassicDesktopStyleApplicationLifetime desktop
+                || desktop.MainWindow is not { } window)
+                return;
+
+            var file = await window.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Экспорт данных",
+                SuggestedFileName = $"notare-backup-{DateTime.Now:yyyy-MM-dd}",
+                DefaultExtension = "json",
+                FileTypeChoices = new[]
+                {
+                    new FilePickerFileType("JSON") { Patterns = new[] { "*.json" } },
+                },
+            });
+
+            if (file is null) return;
+
+            await using (var stream = await file.OpenWriteAsync())
+            await using (var writer = new StreamWriter(stream))
+            {
+                await writer.WriteAsync(json);
+            }
+
+            var dialog = new InfoDialog(
+                "Экспорт завершён",
+                $"Сохранено папок: {folders.Count}, заметок: {notes.Count}.");
+            await dialog.ShowDialog<bool?>(window);
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"→ ОШИБКА экспорта: {ex.Message}");
+        }
+    }
+
     // === НАВИГАЦИЯ ===
 
     [RelayCommand]

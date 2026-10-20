@@ -7,9 +7,6 @@ namespace Diary.Mobile;
 
 public static class MauiProgram
 {
-    // IP ПК в Wi-Fi.
-    private const string ServerUrl = "http://192.168.1.175:5092";
-
     public static MauiApp CreateMauiApp()
     {
         // Инициализация нативного SQLite для Android.
@@ -31,8 +28,8 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<SyncService>();
 
-        // ApiClient — пока оставим, пригодится для синка.
-        builder.Services.AddSingleton<ApiClient>(sp => new ApiClient(ServerUrl));
+        // ApiClient — адрес берётся из настроек (меняется в меню приложения).
+        builder.Services.AddSingleton<ApiClient>(sp => new ApiClient(ServerSettings.HttpUrl));
 
         // Главная VM — Singleton (общее состояние).
         builder.Services.AddSingleton<MainViewModel>();

@@ -14,7 +14,10 @@ namespace Diary.Mobile.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
-    private readonly WebSocketClient _ws;
+    private WebSocketClient _ws = null!;
+
+    // Для смены адреса сервера из настроек.
+    private readonly ApiClient _api;
     private readonly LocalDatabase _db;
     private readonly SyncService _sync;
 
@@ -129,14 +132,23 @@ public partial class MainViewModel : ViewModelBase
 
     private static readonly CultureInfo RuCulture = new("ru-RU");
 
-    public MainViewModel(LocalDatabase db, SyncService sync)
+    public MainViewModel(LocalDatabase db, SyncService sync, ApiClient api)
     {
         _db = db;
         _sync = sync;
+        _api = api;
 
-        // WebSocket для мгновенного синка.
+        // WebSocket для мгновенного синка (адрес — из настроек).
+        StartWebSocket();
+
+        _ = InitializeAsync();
+    }
+
+    // (Пере)подключение WebSocket к текущему адресу сервера.
+    private void StartWebSocket()
+    {
         _ws = new WebSocketClient(
-            "ws://192.168.1.175:5092/ws",
+            ServerSettings.WsUrl,
             onChange: () =>
             {
                 // Callback из WebSocket-потока. Переключаемся на UI-поток.
@@ -147,9 +159,7 @@ public partial class MainViewModel : ViewModelBase
                 });
             });
         _ws.Start();
-        Console.WriteLine("### WebSocket-клиент запущен (mobile)");
-
-        _ = InitializeAsync();
+        Console.WriteLine($"### WebSocket-клиент запущен (mobile): {ServerSettings.WsUrl}");
     }
 
     // === ИНИЦИАЛИЗАЦИЯ ===
@@ -188,13 +198,18 @@ public partial class MainViewModel : ViewModelBase
         Console.WriteLine("### Таймер синка-страховки запущен (5 мин)");
     }
 
-    // Проверка Wi-Fi + синк + обновление UI.
-    private async Task TrySyncAsync()
+    // Тихий автосинк (старое имя для внутренних вызовов).
+    private Task TrySyncAsync() => SyncNowAsync();
+
+    // Настоящий синк с ПК (push+pull) + обновление UI.
+    // Возвращает false, если Wi-Fi нет или сервер недоступен —
+    // это нужно ручному «Обновить данные», чтобы показать ошибку.
+    public async Task<bool> SyncNowAsync()
     {
         if (!Connectivity.Current.ConnectionProfiles.Contains(ConnectionProfile.WiFi))
         {
             Console.WriteLine("→ Wi-Fi нет, синк пропущен");
-            return;
+            return false;
         }
 
         Console.WriteLine("→ Запускаю синк...");
@@ -209,6 +224,21 @@ public partial class MainViewModel : ViewModelBase
         {
             Console.WriteLine("→ Синк не удался");
         }
+
+        return ok;
+    }
+
+    // Смена адреса сервера из меню: сохраняем, переподключаем WS, пробуем синк.
+    // false — по новому адресу сервер не отвечает.
+    public async Task<bool> ApplyServerUrlAsync(string url)
+    {
+        ServerSettings.Save(url);
+        _api.SetBaseUrl(ServerSettings.HttpUrl);
+
+        _ws.Stop();
+        StartWebSocket();
+
+        return await SyncNowAsync();
     }
 
     // === ЗАГРУЗКА ДАННЫХ ===

@@ -1,4 +1,5 @@
 ﻿using Diary.Mobile.Models;
+using Diary.Mobile.Services;
 using Diary.Mobile.ViewModels;
 
 namespace Diary.Mobile;
@@ -17,11 +18,40 @@ public partial class MainPage : ContentPage
     // Меню ⋮
     private async void OnMenuClicked(object? sender, EventArgs e)
     {
-        var action = await DisplayActionSheetAsync("Меню", "Отмена", null, "Обновить данные");
+        var action = await DisplayActionSheetAsync("Меню", "Отмена", null,
+            "Обновить данные", "Адрес сервера");
 
         if (action == "Обновить данные")
         {
-            await _vm.LoadInitialDataAsync();
+            var ok = await _vm.SyncNowAsync();
+            if (!ok)
+            {
+                await DisplayAlertAsync("Нет связи с ПК",
+                    "Не удалось синхронизироваться с компьютером. Проверьте, что сервер " +
+                    "запущен на ПК и телефон в той же Wi-Fi сети. Текущий адрес сервера " +
+                    "можно поменять в меню «Адрес сервера».",
+                    "ОК");
+            }
+        }
+        else if (action == "Адрес сервера")
+        {
+            var input = await DisplayPromptAsync(
+                "Адрес сервера",
+                "Например, http://192.168.1.175:5092",
+                "Сохранить", "Отмена",
+                initialValue: ServerSettings.HttpUrl,
+                keyboard: Keyboard.Url);
+
+            if (string.IsNullOrWhiteSpace(input)) return;
+
+            var ok = await _vm.ApplyServerUrlAsync(input);
+            if (!ok)
+            {
+                await DisplayAlertAsync("Адрес сохранён",
+                    "Но сервер по этому адресу пока не отвечает. Он заработает, " +
+                    "когда ПК будет доступен в сети.",
+                    "ОК");
+            }
         }
     }
 

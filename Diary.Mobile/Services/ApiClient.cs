@@ -21,6 +21,15 @@ namespace Diary.Mobile.Services
             _http = new HttpClient { BaseAddress = new Uri(baseUrl) };
         }
 
+        // Смена базового адреса — когда пользователь указал новый IP в настройках.
+        public void SetBaseUrl(string baseUrl)
+        {
+            if (!baseUrl.EndsWith("/"))
+                baseUrl += "/";
+
+            _http.BaseAddress = new Uri(baseUrl);
+        }
+
         // === ЗАМЕТКИ ===
 
         public async Task<List<Note>> GetNotesAsync()

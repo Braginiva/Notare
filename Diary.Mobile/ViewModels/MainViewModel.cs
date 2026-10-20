@@ -141,6 +141,9 @@ public partial class MainViewModel : ViewModelBase
         // WebSocket для мгновенного синка (адрес — из настроек).
         StartWebSocket();
 
+        // Вернулись из фона — сразу синкаемся, не дожидаясь таймера.
+        App.Resumed += (_, _) => _ = TrySyncAsync();
+
         _ = InitializeAsync();
     }
 

@@ -196,8 +196,8 @@ public partial class MainViewModel : ViewModelBase
     // ожидание сервера идёт в фоне.
     private async Task StartServicesAsync()
     {
-        // Первый запуск: ярлык на рабочем столе, чтобы было откуда запускать.
-        EnsureDesktopShortcutOnFirstRun();
+        // Ярлыки: миграция старого имени + ярлык на рабочем столе при первом запуске.
+        EnsureShortcutsOnStartup();
 
         var started = await ServerLauncher.EnsureStartedAsync();
 
@@ -233,6 +233,11 @@ public partial class MainViewModel : ViewModelBase
 
     private static string DesktopShortcutPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+        "Notare.lnk");
+
+    // Старое имя ярлыка (когда приложение называлось «Дневник») — для миграции.
+    private static string OldDesktopShortcutPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
         "Дневник.lnk");
 
     // Маркер первого запуска: ярлык на рабочем столе создаём только один раз,
@@ -255,7 +260,7 @@ public partial class MainViewModel : ViewModelBase
 
     [RelayCommand]
     private void ToggleDesktopShortcut() => ToggleShortcutFile(
-        DesktopShortcutPath, "Дневник — персональный дневник");
+        DesktopShortcutPath, "Notare — персональный дневник");
 
     // Общий переключатель: есть ярлык — удаляем, нет — создаём.
     private void ToggleShortcutFile(string shortcutPath, string description)
@@ -285,12 +290,29 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(DesktopShortcutHeader));
     }
 
-    // При первом запуске: кладём ярлык «Дневник» на рабочий стол, чтобы было
-    // откуда запускать. Маркер в %AppData% — чтобы после удаления не появлялся снова.
-    public void EnsureDesktopShortcutOnFirstRun()
+    // При старте: мигрируем ярлыки под текущее имя и exe, плюс при самом первом
+    // запуске кладём ярлык на рабочий стол (маркер в %AppData% — чтобы после
+    // удаления через меню он не появлялся снова).
+    public void EnsureShortcutsOnStartup()
     {
         try
         {
+            // Старый ярлык «Дневник.lnk» переименовываем в «Notare.lnk».
+            if (File.Exists(OldDesktopShortcutPath) && !File.Exists(DesktopShortcutPath))
+            {
+                File.Move(OldDesktopShortcutPath, DesktopShortcutPath);
+                Debug.WriteLine("→ Ярлык «Дневник» переименован в «Notare»");
+            }
+
+            // Ярлыки перепривязываем на текущий exe
+            // (важно после переименования Diary.Desktop.exe → Notare.exe).
+            if (File.Exists(AutoStartShortcutPath))
+                RefreshShortcutTarget(AutoStartShortcutPath);
+
+            if (File.Exists(DesktopShortcutPath))
+                RefreshShortcutTarget(DesktopShortcutPath);
+
+            // Первый запуск: ярлык на рабочем столе, чтобы было откуда запускать.
             if (File.Exists(FirstRunMarkerPath)) return;
 
             Directory.CreateDirectory(Path.GetDirectoryName(FirstRunMarkerPath)!);
@@ -298,14 +320,34 @@ public partial class MainViewModel : ViewModelBase
 
             if (!File.Exists(DesktopShortcutPath))
             {
-                CreateShortcut(DesktopShortcutPath, "Дневник — персональный дневник");
+                CreateShortcut(DesktopShortcutPath, "Notare — персональный дневник");
                 Debug.WriteLine("→ Первый запуск: создан ярлык на рабочем столе");
             }
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"→ ОШИБКА ярлыка (первый запуск): {ex.Message}");
+            Debug.WriteLine($"→ ОШИБКА ярлыков при старте: {ex.Message}");
         }
+    }
+
+    // Перепривязывает существующий ярлык на текущий exe, если тот сменился.
+    private static void RefreshShortcutTarget(string shortcutPath)
+    {
+        var exePath = Environment.ProcessPath;
+        if (exePath is null) return;
+
+        var shellType = Type.GetTypeFromProgID("WScript.Shell");
+        if (shellType is null) return;
+
+        dynamic shell = Activator.CreateInstance(shellType)!;
+        dynamic shortcut = shell.CreateShortcut(shortcutPath);
+
+        if ((string?)shortcut.TargetPath == exePath) return;
+
+        shortcut.TargetPath = exePath;
+        shortcut.WorkingDirectory = Path.GetDirectoryName(exePath);
+        shortcut.Save();
+        Debug.WriteLine($"→ Ярлык перепривязан на {exePath}: {shortcutPath}");
     }
 
     // Ярлык через WScript.Shell (без прав администратора).

@@ -8,7 +8,7 @@
         x:Class="Diary.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/notare.ico"
-        Title="Дневник"
+        Title="Notare"
         Width="900" Height="600"
         Background="{StaticResource BrushBackgroundApp}">
 

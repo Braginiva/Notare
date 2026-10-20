@@ -140,7 +140,7 @@ public static class ServerLauncher
     {
         var baseDir = AppContext.BaseDirectory;
 
-        var sibling = Path.Combine(baseDir, "Diary.Server.exe");
+        var sibling = Path.Combine(baseDir, "Notare.Server.exe");
         if (File.Exists(sibling)) return sibling;
 
         // Поднимаемся вверх до корня репозитория (в нём лежит Diary.slnx).
@@ -149,7 +149,7 @@ public static class ServerLauncher
         {
             if (File.Exists(Path.Combine(dir.FullName, "Diary.slnx")))
             {
-                var dev = Path.Combine(dir.FullName, "Diary.Server", "bin", "Debug", "net10.0", "Diary.Server.exe");
+                var dev = Path.Combine(dir.FullName, "Diary.Server", "bin", "Debug", "net10.0", "Notare.Server.exe");
                 return File.Exists(dev) ? dev : null;
             }
 

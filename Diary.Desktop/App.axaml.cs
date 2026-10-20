@@ -55,9 +55,12 @@ public partial class App : Application
         menu.Items.Add(openItem);
         menu.Items.Add(exitItem);
 
+        // Имя сборки может измениться (AssemblyName в csproj) — берём его из кода.
+        var asmName = typeof(App).Assembly.GetName().Name;
+
         _trayIcon = new TrayIcon
         {
-            Icon = new WindowIcon(AssetLoader.Open(new Uri("avares://Diary.Desktop/Assets/notare.png"))),
+            Icon = new WindowIcon(AssetLoader.Open(new Uri($"avares://{asmName}/Assets/notare.png"))),
             ToolTipText = "Notare",
             Menu = menu,
         };

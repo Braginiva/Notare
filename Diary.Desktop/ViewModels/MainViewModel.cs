@@ -5,12 +5,17 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
+using Avalonia;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Diary.Desktop.Models;
 using Diary.Desktop.Services;
+using Diary.Desktop.Views;
 
 namespace Diary.Desktop.ViewModels;
 
@@ -333,6 +338,8 @@ public partial class MainViewModel : ViewModelBase
     // Перепривязывает существующий ярлык на текущий exe, если тот сменился.
     private static void RefreshShortcutTarget(string shortcutPath)
     {
+        if (!OperatingSystem.IsWindows()) return;
+
         var exePath = Environment.ProcessPath;
         if (exePath is null) return;
 
@@ -368,6 +375,23 @@ public partial class MainViewModel : ViewModelBase
         shortcut.WorkingDirectory = Path.GetDirectoryName(exePath);
         shortcut.Description = description;
         shortcut.Save();
+    }
+
+    // === ТЕМА И ЭКСПОРТ ===
+
+    // Галочки в подменю темы.
+    public string ThemeLightHeader => DesktopTheme.Current == DesktopTheme.Light ? "✓ Светлая" : "Светлая";
+    public string ThemeDarkHeader => DesktopTheme.Current == DesktopTheme.Dark ? "✓ Тёмная" : "Тёмная";
+    public string ThemeSystemHeader => DesktopTheme.Current == DesktopTheme.System ? "✓ Системная" : "Системная";
+
+    [RelayCommand]
+    private void SetTheme(string theme)
+    {
+        DesktopTheme.Apply(theme);
+
+        OnPropertyChanged(nameof(ThemeLightHeader));
+        OnPropertyChanged(nameof(ThemeDarkHeader));
+        OnPropertyChanged(nameof(ThemeSystemHeader));
     }
 
     // === НАВИГАЦИЯ ===

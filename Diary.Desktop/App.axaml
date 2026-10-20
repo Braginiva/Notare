@@ -1,32 +1,64 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Diary.Desktop.App"
-             RequestedThemeVariant="Dark">
+             x:Class="Diary.Desktop.App">
 
 	<Application.Resources>
 		<ResourceDictionary>
+			<ResourceDictionary.ThemeDictionaries>
 
-			<!-- ФОНЫ -->
-			<Color x:Key="ColorBackgroundApp">#191919</Color>
-			<Color x:Key="ColorBackgroundPanel">#202020</Color>
-			<Color x:Key="ColorBackgroundCard">#252525</Color>
+				<!-- СВЕТЛАЯ ТЕМА -->
+				<ResourceDictionary x:Key="Light">
 
-			<!-- ТЕКСТ -->
-			<Color x:Key="ColorTextPrimary">#E5E5E5</Color>
-			<Color x:Key="ColorTextSecondary">#8A8A8A</Color>
+					<!-- ФОНЫ -->
+					<Color x:Key="ColorBackgroundApp">#F5F5F5</Color>
+					<Color x:Key="ColorBackgroundPanel">#EBEBEB</Color>
+					<Color x:Key="ColorBackgroundCard">#FFFFFF</Color>
 
-			<!-- АКЦЕНТ -->
-			<Color x:Key="ColorAccent">#FFFFFF</Color>
-			<Color x:Key="ColorAccentText">#191919</Color>
+					<!-- ТЕКСТ -->
+					<Color x:Key="ColorTextPrimary">#1A1A1A</Color>
+					<Color x:Key="ColorTextSecondary">#6B6B6B</Color>
 
-			<SolidColorBrush x:Key="BrushBackgroundApp" Color="{StaticResource ColorBackgroundApp}" />
-			<SolidColorBrush x:Key="BrushBackgroundPanel" Color="{StaticResource ColorBackgroundPanel}" />
-			<SolidColorBrush x:Key="BrushBackgroundCard" Color="{StaticResource ColorBackgroundCard}" />
-			<SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" />
-			<SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" />
-			<SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
-			<SolidColorBrush x:Key="BrushAccentText" Color="{StaticResource ColorAccentText}" />
+					<!-- АКЦЕНТ -->
+					<Color x:Key="ColorAccent">#1A1A1A</Color>
+					<Color x:Key="ColorAccentText">#F5F5F5</Color>
 
+					<SolidColorBrush x:Key="BrushBackgroundApp" Color="{StaticResource ColorBackgroundApp}" />
+					<SolidColorBrush x:Key="BrushBackgroundPanel" Color="{StaticResource ColorBackgroundPanel}" />
+					<SolidColorBrush x:Key="BrushBackgroundCard" Color="{StaticResource ColorBackgroundCard}" />
+					<SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" />
+					<SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" />
+					<SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
+					<SolidColorBrush x:Key="BrushAccentText" Color="{StaticResource ColorAccentText}" />
+
+				</ResourceDictionary>
+
+				<!-- ТЁМНАЯ ТЕМА (прежние значения по умолчанию) -->
+				<ResourceDictionary x:Key="Dark">
+
+					<!-- ФОНЫ -->
+					<Color x:Key="ColorBackgroundApp">#191919</Color>
+					<Color x:Key="ColorBackgroundPanel">#202020</Color>
+					<Color x:Key="ColorBackgroundCard">#252525</Color>
+
+					<!-- ТЕКСТ -->
+					<Color x:Key="ColorTextPrimary">#E5E5E5</Color>
+					<Color x:Key="ColorTextSecondary">#8A8A8A</Color>
+
+					<!-- АКЦЕНТ -->
+					<Color x:Key="ColorAccent">#FFFFFF</Color>
+					<Color x:Key="ColorAccentText">#191919</Color>
+
+					<SolidColorBrush x:Key="BrushBackgroundApp" Color="{StaticResource ColorBackgroundApp}" />
+					<SolidColorBrush x:Key="BrushBackgroundPanel" Color="{StaticResource ColorBackgroundPanel}" />
+					<SolidColorBrush x:Key="BrushBackgroundCard" Color="{StaticResource ColorBackgroundCard}" />
+					<SolidColorBrush x:Key="BrushTextPrimary" Color="{StaticResource ColorTextPrimary}" />
+					<SolidColorBrush x:Key="BrushTextSecondary" Color="{StaticResource ColorTextSecondary}" />
+					<SolidColorBrush x:Key="BrushAccent" Color="{StaticResource ColorAccent}" />
+					<SolidColorBrush x:Key="BrushAccentText" Color="{StaticResource ColorAccentText}" />
+
+				</ResourceDictionary>
+
+			</ResourceDictionary.ThemeDictionaries>
 		</ResourceDictionary>
 	</Application.Resources>
 

@@ -88,6 +88,16 @@
 							<MenuFlyout>
 								<MenuItem Header="Обновить данные"
 										  Command="{Binding RefreshCommand}" />
+								<Separator />
+								<MenuItem Header="{Binding ThemeLightHeader}"
+										  Command="{Binding SetThemeCommand}"
+										  CommandParameter="light" />
+								<MenuItem Header="{Binding ThemeDarkHeader}"
+										  Command="{Binding SetThemeCommand}"
+										  CommandParameter="dark" />
+								<MenuItem Header="{Binding ThemeSystemHeader}"
+										  Command="{Binding SetThemeCommand}"
+										  CommandParameter="system" />
 								<MenuItem Header="{Binding AutoStartHeader}"
 										  Command="{Binding ToggleAutoStartCommand}" />
 								<MenuItem Header="{Binding DesktopShortcutHeader}"

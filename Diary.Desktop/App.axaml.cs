@@ -21,6 +21,9 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // Тема приложения (светлая/тёмная/системная) — из сохранённой настройки.
+        DesktopTheme.ApplyStored();
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var window = new MainWindow

@@ -13,15 +13,22 @@ public sealed class SpellCheckService
 {
     private readonly List<WordList> _dictionaries = new();
     private readonly HashSet<string> _ignored = new(StringComparer.OrdinalIgnoreCase);
+    private readonly string _dictionariesDir;
+    private readonly string _userWordsPath;
     private bool _loaded;
 
     // Уже загружены ли словари (проверка без словарей ничего не подчёркивает).
     public bool IsLoaded => _loaded;
 
-    // Путь к словам, которые пользователь попросил всегда игнорировать.
-    private static string UserWordsPath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Notare", "user.dic");
+    // Пути по умолчанию: словари — рядом с exe, слова пользователя — в %AppData%.
+    // Аргументы нужны тестам.
+    public SpellCheckService(string? dictionariesDir = null, string? userWordsPath = null)
+    {
+        _dictionariesDir = dictionariesDir ?? Path.Combine(AppContext.BaseDirectory, "Dictionaries");
+        _userWordsPath = userWordsPath ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "Notare", "user.dic");
+    }
 
     // Ленивая загрузка словарей из папки Dictionaries рядом с exe
     // (при первом обращении — чтобы не тормозить старт).
@@ -29,24 +36,31 @@ public sealed class SpellCheckService
     {
         if (_loaded) return;
 
-        var dir = Path.Combine(AppContext.BaseDirectory, "Dictionaries");
-
         foreach (var name in new[] { "ru_RU", "en_US" })
         {
-            var affPath = Path.Combine(dir, name + ".aff");
-            var dicPath = Path.Combine(dir, name + ".dic");
+            var affPath = Path.Combine(_dictionariesDir, name + ".aff");
+            var dicPath = Path.Combine(_dictionariesDir, name + ".dic");
             if (!File.Exists(affPath) || !File.Exists(dicPath)) continue;
 
-            using var affStream = File.OpenRead(affPath);
-            using var dicStream = File.OpenRead(dicPath);
-            _dictionaries.Add(WordList.CreateFromStreams(affStream, dicStream));
+            try
+            {
+                // Порядок важен: первый аргумент — словарь (.dic), второй — аффиксы (.aff).
+                using var dicStream = File.OpenRead(dicPath);
+                using var affStream = File.OpenRead(affPath);
+                _dictionaries.Add(WordList.CreateFromStreams(dicStream, affStream));
+            }
+            catch (Exception ex)
+            {
+                // Битый файл словаря не должен ронять проверку целиком.
+                System.Diagnostics.Debug.WriteLine(
+                    $"→ Словарь {name} не загрузился: {ex.Message}");
+            }
         }
 
         // Пользовательские «всегда игнорировать».
-        var userFile = UserWordsPath;
-        if (File.Exists(userFile))
+        if (File.Exists(_userWordsPath))
         {
-            foreach (var line in File.ReadAllLines(userFile))
+            foreach (var line in File.ReadAllLines(_userWordsPath))
             {
                 if (line.Trim().Length > 0) _ignored.Add(line.Trim());
             }
@@ -60,6 +74,9 @@ public sealed class SpellCheckService
     {
         if (word.Length == 0) return true;
         if (_ignored.Contains(word)) return true;
+
+        // Словари ещё не загружены (или не нашлись) — подчёркивать нечего.
+        if (_dictionaries.Count == 0) return true;
 
         foreach (var dict in _dictionaries)
         {
@@ -95,8 +112,8 @@ public sealed class SpellCheckService
 
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(UserWordsPath)!);
-            File.AppendAllText(UserWordsPath, word + Environment.NewLine);
+            Directory.CreateDirectory(Path.GetDirectoryName(_userWordsPath)!);
+            File.AppendAllText(_userWordsPath, word + Environment.NewLine);
         }
         catch
         {

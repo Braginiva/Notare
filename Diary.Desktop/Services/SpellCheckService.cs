@@ -104,6 +104,12 @@ public sealed class SpellCheckService
         }
     }
 
+    // Игнорировать до перезапуска приложения (без записи в файл).
+    public void IgnoreTemporarily(string word)
+    {
+        _ignored.Add(word);
+    }
+
     // Разбор текста на слова: (начало, длина, слово).
     // Апостроф внутри слова не разрывает его: don't, can't.
     public static List<(int Start, int Length, string Word)> Tokenize(string text)

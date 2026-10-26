@@ -10,6 +10,8 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
+    <!-- Hunspell-словари для проверки орфографии — копируются рядом с exe. -->
+    <Content Include="Dictionaries\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

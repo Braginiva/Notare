@@ -114,6 +114,74 @@ app.MapPost("/notes/{id}/restore", async (Guid id, AppDbContext db) =>
 // ЭНДПОИНТЫ ДЛЯ ПАПОК
 // ============================================================
 
+// Проверка родительской папки при создании/перемещении.
+// Возвращает текст ошибки или null, если всё в порядке.
+// Ловит две грубые ошибки: ссылку на несуществующую/удалённую папку
+// и цикл (папку внутрь самой себя или внутрь одного из её потомков).
+static async Task<string?> ValidateParentAsync(AppDbContext db, Guid folderId, Guid? parentId)
+{
+    if (parentId is null) return null;
+
+    if (parentId == folderId)
+        return "Папку нельзя перенести внутрь самой себя";
+
+    var parent = await db.Folders
+        .FirstOrDefaultAsync(f => f.Id == parentId && !f.IsDeleted);
+    if (parent is null)
+        return "Родительская папка не найдена";
+
+    // Идём вверх по цепочке родителей. Если встретили саму папку —
+    // значит, мы лезем в её же потомка и получился бы цикл.
+    var current = parent;
+    var guard = 0;
+    while (current?.ParentId is not null)
+    {
+        if (current.ParentId == folderId)
+            return "Папку нельзя перенести внутрь её же потомка";
+
+        var parentIdOfParent = current.ParentId;
+        current = await db.Folders
+            .FirstOrDefaultAsync(f => f.Id == parentIdOfParent && !f.IsDeleted);
+
+        if (++guard > 1000) return "Обнаружен цикл в дереве папок";
+    }
+
+    return null;
+}
+
+// Id самой папки + всех её потомков (на любую глубину).
+static async Task<List<Guid>> GetSubtreeIdsAsync(AppDbContext db, Guid rootId)
+{
+    var all = await db.Folders
+        .Where(f => !f.IsDeleted)
+        .Select(f => new { f.Id, f.ParentId })
+        .ToListAsync();
+
+    var children = all
+        .Where(f => f.ParentId is not null)
+        .GroupBy(f => f.ParentId!.Value)
+        .ToDictionary(g => g.Key, g => g.Select(x => x.Id).ToList());
+
+    var result = new List<Guid> { rootId };
+    var queue = new Queue<Guid>();
+    queue.Enqueue(rootId);
+
+    while (queue.Count > 0)
+    {
+        var current = queue.Dequeue();
+        if (!children.TryGetValue(current, out var childIds)) continue;
+
+        foreach (var childId in childIds)
+        {
+            if (result.Contains(childId)) continue;  // защита от цикла в данных
+            result.Add(childId);
+            queue.Enqueue(childId);
+        }
+    }
+
+    return result;
+}
+
 // GET /folders — все не удалённые папки.
 app.MapGet("/folders", async (AppDbContext db) =>
     await db.Folders.Where(f => !f.IsDeleted).ToListAsync());
@@ -125,9 +193,12 @@ app.MapGet("/folders/{id}", async (Guid id, AppDbContext db) =>
     return folder is null ? Results.NotFound() : Results.Ok(folder);
 });
 
-// POST /folders — создать папку.
+// POST /folders — создать папку (ParentId опционален: null = корневая).
 app.MapPost("/folders", async (Folder folder, AppDbContext db) =>
 {
+    var error = await ValidateParentAsync(db, folder.Id, folder.ParentId);
+    if (error is not null) return Results.BadRequest(new { error });
+
     folder.UpdatedAt = DateTime.UtcNow;
     folder.IsDeleted = false;
     db.Folders.Add(folder);
@@ -138,14 +209,18 @@ app.MapPost("/folders", async (Folder folder, AppDbContext db) =>
     return Results.Created($"/folders/{folder.Id}", folder);
 });
 
-// PUT /folders/{id} — обновить имя папки.
+// PUT /folders/{id} — обновить имя папки и/или родителя (перемещение).
 // Поле IsDeleted опционально — аналогично PUT /notes (восстановление через синк).
 app.MapPut("/folders/{id}", async (Guid id, FolderUpdate updated, AppDbContext db) =>
 {
     var existing = await db.Folders.FirstOrDefaultAsync(f => f.Id == id);
     if (existing is null) return Results.NotFound();
 
+    var error = await ValidateParentAsync(db, id, updated.ParentId);
+    if (error is not null) return Results.BadRequest(new { error });
+
     existing.Name = updated.Name;
+    existing.ParentId = updated.ParentId;
     if (updated.IsDeleted is not null)
     {
         existing.IsDeleted = updated.IsDeleted.Value;
@@ -159,7 +234,9 @@ app.MapPut("/folders/{id}", async (Guid id, FolderUpdate updated, AppDbContext d
     return Results.Ok(existing);
 });
 
-// DELETE /folders/{id} — soft delete папки + всех её заметок. ИДЕМПОТЕНТНО.
+// DELETE /folders/{id} — soft delete папки, всех её потомков и их заметок.
+// ИДЕМПОТЕНТНО. Заметки и вложенные папки восстанавливает клиент отдельно
+// (только то, что реально было в дереве), чтобы не оживить удалённое по отдельности.
 app.MapDelete("/folders/{id}", async (Guid id, AppDbContext db) =>
 {
     var folder = await db.Folders.FirstOrDefaultAsync(f => f.Id == id);
@@ -168,12 +245,21 @@ app.MapDelete("/folders/{id}", async (Guid id, AppDbContext db) =>
         return Results.NoContent();
     }
 
+    var subtreeIds = await GetSubtreeIdsAsync(db, id);
     var now = DateTime.UtcNow;
 
-    folder.IsDeleted = true;
-    folder.UpdatedAt = now;
+    var folders = await db.Folders
+        .Where(f => subtreeIds.Contains(f.Id) && !f.IsDeleted)
+        .ToListAsync();
+    foreach (var f in folders)
+    {
+        f.IsDeleted = true;
+        f.UpdatedAt = now;
+    }
 
-    var notes = await db.Notes.Where(n => n.FolderId == id && !n.IsDeleted).ToListAsync();
+    var notes = await db.Notes
+        .Where(n => n.FolderId != null && subtreeIds.Contains(n.FolderId.Value) && !n.IsDeleted)
+        .ToListAsync();
     foreach (var note in notes)
     {
         note.IsDeleted = true;
@@ -336,6 +422,9 @@ public class Folder
     public string Name { get; set; } = "";
     public DateTime CreatedAt { get; set; }
 
+    // Родительская папка: null = корневая. Вложенность любая по глубине.
+    public Guid? ParentId { get; set; }
+
     public DateTime UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }
 }
@@ -351,9 +440,11 @@ public class NoteUpdate
 }
 
 // Тело PUT /folders/{id}: та же идея с опциональным IsDeleted.
+// ParentId опционален по смыслу: null = папка корневая (перемещение в корень).
 public class FolderUpdate
 {
     public string Name { get; set; } = "";
+    public Guid? ParentId { get; set; }
     public bool? IsDeleted { get; set; }
 }
 

@@ -19,9 +19,12 @@
 
         <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
         <Grid Grid.Row="0"
-              ColumnDefinitions="Auto,*,Auto"
+              RowDefinitions="Auto,Auto"
               BackgroundColor="#202020"
               Padding="12,10">
+
+            <Grid Grid.Row="0"
+                  ColumnDefinitions="Auto,*,Auto">
 
             <Button Grid.Column="0"
                     Text="←"
@@ -72,6 +75,36 @@
                     BackgroundColor="Transparent"
                     TextColor="#E5E5E5"
                     Clicked="OnMenuClicked" />
+            </Grid>
+
+            <!-- КРОШКИ: Главная / Работа / Проекты -->
+            <HorizontalStackLayout Grid.Row="1"
+                                   IsVisible="{Binding IsBreadcrumbVisible}"
+                                   BindableLayout.ItemsSource="{Binding Breadcrumbs}"
+                                   Spacing="4"
+                                   Margin="8,4,0,0">
+                <BindableLayout.ItemTemplate>
+                    <DataTemplate x:DataType="models:FolderCrumb">
+                        <HorizontalStackLayout Spacing="4">
+                            <Label Text="{Binding Name}"
+                                   FontSize="12"
+                                   TextColor="#7EB6FF"
+                                   VerticalOptions="Center">
+                                <Label.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenCrumbCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </Label.GestureRecognizers>
+                            </Label>
+                            <Label Text="›"
+                                   FontSize="12"
+                                   TextColor="#8A8A8A"
+                                   VerticalOptions="Center"
+                                   IsVisible="{Binding HasSeparator}" />
+                        </HorizontalStackLayout>
+                    </DataTemplate>
+                </BindableLayout.ItemTemplate>
+            </HorizontalStackLayout>
         </Grid>
 
         <!-- ПОИСК -->
@@ -135,8 +168,85 @@
                 </CollectionView.ItemTemplate>
             </CollectionView>
 
-            <!-- ЭКРАН 2: ЗАМЕТКИ (группы по датам) -->
-            <CollectionView IsVisible="{Binding IsOnNotesScreen}"
+            <!-- ЭКРАН 2: ПОДПАПКИ + ЗАМЕТКИ (группы по датам) -->
+            <Grid IsVisible="{Binding IsOnNotesScreen}">
+                <Grid.RowDefinitions>Auto,*</Grid.RowDefinitions>
+
+                <!-- ПОДПАПКИ -->
+                <ScrollView Grid.Row="0"
+                            Orientation="Horizontal"
+                            Padding="16,8,16,0">
+                    <HorizontalStackLayout Spacing="10">
+                        <HorizontalStackLayout BindableLayout.ItemsSource="{Binding SubFolders}"
+                                               Spacing="10">
+                            <BindableLayout.ItemTemplate>
+                                <DataTemplate x:DataType="models:LocalFolder">
+                                    <SwipeView>
+                                        <SwipeView.RightItems>
+                                            <SwipeItems Mode="Execute">
+                                                <SwipeItem Text="Удалить"
+                                                           BackgroundColor="#E53935"
+                                                           Clicked="OnDeleteFolderClicked" />
+                                            </SwipeItems>
+                                        </SwipeView.RightItems>
+                                        <Border BackgroundColor="#252525"
+                                                Stroke="#333333"
+                                                StrokeThickness="1"
+                                                Padding="12"
+                                                StrokeShape="RoundRectangle 12"
+                                                WidthRequest="120"
+                                                HeightRequest="96">
+                                            <Border.GestureRecognizers>
+                                                <TapGestureRecognizer
+                                                    Command="{Binding Source={x:Reference PageRoot}, Path=BindingContext.OpenFolderCommand}"
+                                                    CommandParameter="{Binding .}" />
+                                            </Border.GestureRecognizers>
+                                            <VerticalStackLayout VerticalOptions="Center"
+                                                                 Spacing="6">
+                                                <Image Source="folder.png"
+                                                       HeightRequest="30"
+                                                       Aspect="AspectFit"
+                                                       HorizontalOptions="Center" />
+                                                <Label Text="{Binding Name}"
+                                                       FontSize="12"
+                                                       TextColor="#E5E5E5"
+                                                       HorizontalTextAlignment="Center" />
+                                            </VerticalStackLayout>
+                                        </Border>
+                                    </SwipeView>
+                                </DataTemplate>
+                            </BindableLayout.ItemTemplate>
+                        </HorizontalStackLayout>
+
+                        <!-- «Новая папка»: создаёт подпапку текущей -->
+                        <Border IsVisible="{Binding IsSubFoldersVisible}"
+                                BackgroundColor="#252525"
+                                Stroke="#333333"
+                                StrokeThickness="1"
+                                Padding="12"
+                                StrokeShape="RoundRectangle 12"
+                                WidthRequest="120"
+                                HeightRequest="96">
+                            <Border.GestureRecognizers>
+                                <TapGestureRecognizer Command="{Binding CreateSubFolderCommand}" />
+                            </Border.GestureRecognizers>
+                            <VerticalStackLayout VerticalOptions="Center"
+                                                 Spacing="6">
+                                <Label Text="+"
+                                       FontSize="26"
+                                       TextColor="#7EB6FF"
+                                       HorizontalTextAlignment="Center" />
+                                <Label Text="Новая папка"
+                                       FontSize="12"
+                                       TextColor="#8A8A8A"
+                                       HorizontalTextAlignment="Center" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </HorizontalStackLayout>
+                </ScrollView>
+
+                <CollectionView Grid.Row="1"
+                            IsVisible="{Binding IsOnNotesScreen}"
                             ItemsSource="{Binding NoteGroups}"
                             IsGrouped="True"
                             SelectionMode="None">
@@ -195,6 +305,7 @@
                     </DataTemplate>
                 </CollectionView.ItemTemplate>
             </CollectionView>
+            </Grid>
 
             <!-- ЭКРАН 3: РЕДАКТОР -->
             <Editor IsVisible="{Binding IsOnEditorScreen}"

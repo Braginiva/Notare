@@ -15,6 +15,9 @@ public partial class LocalFolder : ObservableObject
     [property: MaxLength(200)]
     public partial string Name { get; set; }
 
+    // Родительская папка: null = корневая (верхний уровень главного экрана).
+    public Guid? ParentId { get; set; }
+
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public bool IsDeleted { get; set; }

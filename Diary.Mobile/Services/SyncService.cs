@@ -48,10 +48,36 @@ public class SyncService
 
     // === ОТПРАВКА ЛОКАЛЬНЫХ ИЗМЕНЕНИЙ ===
 
+    // Сортировка по глубине: корневые папки первыми, потом их дети.
+    // Без этого сервер отклонит папку, чей родитель ещё не создан.
+    private static List<LocalFolder> OrderParentsFirst(
+        List<LocalFolder> folders, List<LocalFolder> allFolders)
+    {
+        var byId = allFolders.ToDictionary(f => f.Id);
+
+        int Depth(LocalFolder folder)
+        {
+            var depth = 0;
+            LocalFolder? current = folder;
+            while (current is not null && current.ParentId is not null && depth < 64)
+            {
+                if (!byId.TryGetValue(current.ParentId.Value, out var parent)) break;
+                current = parent;
+                depth++;
+            }
+            return depth;
+        }
+
+        return folders.OrderBy(Depth).ToList();
+    }
+
     private async Task PushLocalChangesAsync()
     {
-        // Папки
+        // Папки. Родителей отправляем раньше детей: сервер не примет папку,
+        // чей ParentId указывает на ещё не существующую папку.
         var unsyncedFolders = await _db.GetUnsyncedFoldersAsync();
+        var liveFolders = await _db.GetFoldersAsync();
+        unsyncedFolders = OrderParentsFirst(unsyncedFolders, liveFolders);
         Console.WriteLine($"→ Папок на отправку: {unsyncedFolders.Count}");
 
         foreach (var folder in unsyncedFolders)
@@ -71,7 +97,8 @@ public class SyncService
                     {
                         Id = folder.Id,
                         Name = folder.Name,
-                        CreatedAt = folder.CreatedAt
+                        CreatedAt = folder.CreatedAt,
+                        ParentId = folder.ParentId
                     };
 
                     if (!existsOnServer)
@@ -165,6 +192,7 @@ public class SyncService
                 {
                     Id = remote.Id,
                     Name = remote.Name,
+                    ParentId = remote.ParentId,
                     CreatedAt = remote.CreatedAt,
                     UpdatedAt = remote.UpdatedAt,
                     IsDeleted = remote.IsDeleted,
@@ -174,6 +202,7 @@ public class SyncService
             else if (remote.UpdatedAt > local.UpdatedAt)
             {
                 local.Name = remote.Name;
+                local.ParentId = remote.ParentId;
                 local.UpdatedAt = remote.UpdatedAt;
                 local.IsDeleted = remote.IsDeleted;
                 local.IsSynced = true;

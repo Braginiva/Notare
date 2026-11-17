@@ -30,7 +30,38 @@ public class LocalDatabase
         await _connection.CreateTableAsync<LocalNote>();
         await _connection.CreateTableAsync<LocalFolder>();
 
+        // Миграция старых баз: у папок появилась колонка ParentId.
+        // CreateTableAsync новые колонки к уже существующей таблице не дописывает.
+        var folderIdType = await GetDeclaredColumnTypeAsync(_connection, "Notes", "FolderId");
+        await EnsureColumnAsync(_connection, "Folders", "ParentId", folderIdType);
+
         return _connection;
+    }
+
+    // Тип колонки из PRAGMA table_info — чтобы ALTER создал колонку
+    // ровно такой же, как её создал бы CreateTableAsync.
+    private sealed class ColumnInfo
+    {
+        public string Name { get; set; } = "";
+        public string Type { get; set; } = "";
+    }
+
+    private static async Task<string> GetDeclaredColumnTypeAsync(
+        SQLiteAsyncConnection db, string table, string column)
+    {
+        var columns = await db.QueryAsync<ColumnInfo>($"PRAGMA table_info(\"{table}\")");
+        return columns.FirstOrDefault(c => c.Name == column)?.Type ?? "GUID";
+    }
+
+    // Добавляет колонку в существующую таблицу, если её ещё нет.
+    private static async Task EnsureColumnAsync(
+        SQLiteAsyncConnection db, string table, string column, string type)
+    {
+        var columns = await db.QueryAsync<ColumnInfo>($"PRAGMA table_info(\"{table}\")");
+        if (columns.Any(c => c.Name == column)) return;
+
+        await db.ExecuteAsync($"ALTER TABLE \"{table}\" ADD COLUMN \"{column}\" {type}");
+        Console.WriteLine($"→ Миграция базы: добавлена колонка {table}.{column}");
     }
 
     // === ИНИЦИАЛИЗАЦИЯ ===
@@ -122,14 +153,34 @@ public class LocalDatabase
         var folder = await GetFolderAsync(id);
         if (folder is null) return;
 
-        folder.IsDeleted = true;
-        folder.IsSynced = false;
-        folder.UpdatedAt = DateTime.UtcNow;
-        await db.InsertOrReplaceAsync(folder);
+        // Всё дерево: сама папка + вложенные потомки любого уровня.
+        var all = await db.Table<LocalFolder>().Where(f => !f.IsDeleted).ToListAsync();
+        var subtree = new List<LocalFolder> { folder };
 
-        // Помечаем все заметки в этой папке как удалённые.
-        var notes = await GetNotesByFolderAsync(id);
-        foreach (var note in notes)
+        for (var i = 0; i < subtree.Count; i++)
+        {
+            var parentId = subtree[i].Id;
+            foreach (var child in all.Where(f => f.ParentId == parentId))
+            {
+                if (subtree.Any(s => s.Id == child.Id)) continue;  // цикл в данных
+                subtree.Add(child);
+            }
+        }
+
+        foreach (var f in subtree)
+        {
+            f.IsDeleted = true;
+            f.IsSynced = false;
+            f.UpdatedAt = DateTime.UtcNow;
+            await db.InsertOrReplaceAsync(f);
+        }
+
+        // Помечаем заметки всего дерева как удалённые.
+        var subtreeIds = subtree.Select(f => f.Id).ToHashSet();
+        var notes = await db.Table<LocalNote>().Where(n => !n.IsDeleted).ToListAsync();
+
+        foreach (var note in notes.Where(n =>
+                     n.FolderId is not null && subtreeIds.Contains(n.FolderId.Value)))
         {
             note.IsDeleted = true;
             note.IsSynced = false;
@@ -153,15 +204,19 @@ public class LocalDatabase
         await db.InsertOrReplaceAsync(note);
     }
 
-    // Восстанавливает папку и явно перечисленные заметки — те, что были в ней
-    // на момент удаления (сервер сам их не возвращает).
-    public async Task RestoreFolderAsync(Guid id, IEnumerable<Guid> noteIds)
+    // Восстанавливает папку, её подпапки и явно перечисленные заметки —
+    // то, что реально было в дереве на момент удаления
+    // (сервер сам ничего, кроме папки, не возвращает).
+    public async Task RestoreFolderAsync(
+        Guid id, IEnumerable<Guid> folderIds, IEnumerable<Guid> noteIds)
     {
         var db = await GetConnectionAsync();
 
-        var folder = await GetFolderAsync(id);
-        if (folder is not null)
+        foreach (var folderId in new[] { id }.Concat(folderIds).Distinct())
         {
+            var folder = await GetFolderAsync(folderId);
+            if (folder is null) continue;
+
             folder.IsDeleted = false;
             folder.IsSynced = false;
             folder.UpdatedAt = DateTime.UtcNow;

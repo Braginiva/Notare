@@ -62,7 +62,7 @@ public partial class MainPage : ContentPage
 
         var confirmed = await DisplayAlertAsync(
             "Удалить папку?",
-            $"Папка «{folder.Name}» и все её заметки будут удалены. " +
+            $"Папка «{folder.Name}», её подпапки и все заметки будут удалены. " +
             "В течение 5 секунд действие можно отменить.",
             "Удалить", "Отмена");
 

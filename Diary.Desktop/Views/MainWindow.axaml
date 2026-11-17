@@ -35,7 +35,8 @@
 			<Border Grid.Row="0"
                     Background="{DynamicResource BrushBackgroundPanel}"
                     Padding="12">
-				<Grid ColumnDefinitions="Auto,*,Auto">
+				<StackPanel>
+					<Grid ColumnDefinitions="Auto,*,Auto">
 
 					<Button Grid.Column="0"
                             Command="{Binding GoBackCommand}"
@@ -109,7 +110,40 @@
 							</MenuFlyout>
 						</Button.Flyout>
 					</Button>
-				</Grid>
+					</Grid>
+
+					<!-- КРОШКИ: Главная / Работа / Проекты -->
+					<ItemsControl ItemsSource="{Binding Breadcrumbs}"
+                                  IsVisible="{Binding IsBreadcrumbVisible}"
+                                  Margin="12,6,0,0">
+						<ItemsControl.ItemsPanel>
+							<ItemsPanelTemplate>
+								<WrapPanel Orientation="Horizontal" />
+							</ItemsPanelTemplate>
+						</ItemsControl.ItemsPanel>
+
+						<ItemsControl.ItemTemplate>
+							<DataTemplate x:DataType="models:FolderCrumb">
+								<StackPanel Orientation="Horizontal">
+									<Button Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenCrumbCommand}"
+                                            CommandParameter="{Binding}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="0"
+                                            FontSize="12"
+                                            Foreground="{DynamicResource BrushAccent}"
+                                            Content="{Binding Name}" />
+									<TextBlock Text="›"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource BrushTextSecondary}"
+                                               Margin="6,0"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding HasSeparator}" />
+								</StackPanel>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</StackPanel>
 			</Border>
 
 			<!-- ПОИСК -->
@@ -214,7 +248,87 @@
 				<ScrollViewer Padding="16"
                               Background="{DynamicResource BrushBackgroundApp}"
                               IsVisible="{Binding IsOnNotesScreen}">
-					<ItemsControl ItemsSource="{Binding NoteGroups}">
+					<StackPanel>
+
+						<!-- ПОДПАПКИ -->
+						<ItemsControl ItemsSource="{Binding SubFolders}"
+                                      IsVisible="{Binding IsSubFoldersVisible}"
+                                      Margin="0,0,0,4">
+							<ItemsControl.ItemsPanel>
+								<ItemsPanelTemplate>
+									<WrapPanel Orientation="Horizontal" />
+								</ItemsPanelTemplate>
+							</ItemsControl.ItemsPanel>
+
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<Button Command="{Binding $parent[ItemsControl].((vm:MainViewModel)DataContext).OpenFolderCommand}"
+                                            CommandParameter="{Binding}"
+                                            Width="160" Height="110"
+                                            Margin="0,8,8,0"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderThickness="0">
+										<Button.ContextMenu>
+											<ContextMenu>
+												<MenuItem Header="Удалить"
+                                                          Click="OnDeleteFolderClick" />
+											</ContextMenu>
+										</Button.ContextMenu>
+
+										<Border Background="{DynamicResource BrushBackgroundCard}"
+                                                CornerRadius="12"
+                                                Padding="12">
+											<StackPanel VerticalAlignment="Center"
+                                                        HorizontalAlignment="Center">
+												<Image Source="/Assets/folder.png"
+                                                       Height="36"
+                                                       Width="44"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Center" />
+												<TextBlock Text="{Binding Name}"
+                                                           FontSize="13"
+                                                           Foreground="{DynamicResource BrushTextPrimary}"
+                                                           TextWrapping="Wrap"
+                                                           TextAlignment="Center"
+                                                           HorizontalAlignment="Center"
+                                                           Margin="0,8,0,0" />
+											</StackPanel>
+										</Border>
+									</Button>
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+
+						<!-- «Новая папка»: создаёт подпапку текущей -->
+						<Button Command="{Binding CreateSubFolderCommand}"
+                                IsVisible="{Binding IsSubFoldersVisible}"
+                                Width="160" Height="110"
+                                Margin="0,8,8,0"
+                                Padding="0"
+                                Background="Transparent"
+                                BorderThickness="0">
+							<Border Background="{DynamicResource BrushBackgroundCard}"
+                                    CornerRadius="12"
+                                    Padding="12">
+								<StackPanel VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Spacing="8">
+									<Path Data="M 0,10 L 20,10 M 10,0 L 10,20"
+                                          Stroke="{DynamicResource BrushAccent}"
+                                          StrokeThickness="2.5"
+                                          StrokeLineCap="Round"
+                                          HorizontalAlignment="Center" />
+									<TextBlock Text="Новая папка"
+                                               FontSize="13"
+                                               Foreground="{DynamicResource BrushTextSecondary}"
+                                               TextAlignment="Center" />
+								</StackPanel>
+							</Border>
+						</Button>
+
+						<!-- ЗАМЕТКИ (группы по датам) -->
+						<ItemsControl ItemsSource="{Binding NoteGroups}">
 						<ItemsControl.ItemTemplate>
 							<DataTemplate x:DataType="models:NoteGroup">
 								<StackPanel Margin="0,4,0,8">
@@ -277,6 +391,7 @@
 							</DataTemplate>
 						</ItemsControl.ItemTemplate>
 					</ItemsControl>
+					</StackPanel>
 				</ScrollViewer>
 
 				<!-- ЭКРАН 3: РЕДАКТОР -->

@@ -40,7 +40,7 @@ public partial class MainWindow : Window
 
         var dialog = new ConfirmDialog(
             "Удалить папку?",
-            $"Папка «{folder.Name}» и все её заметки будут удалены. " +
+            $"Папка «{folder.Name}», её подпапки и все заметки будут удалены. " +
             "В течение 5 секунд действие можно отменить.");
 
         if (await dialog.ShowDialog<bool?>(this) == true)

@@ -45,6 +45,12 @@ public partial class MainViewModel : ViewModelBase
     public ObservableCollection<Folder> Folders { get; } = new();
     public ObservableCollection<Note> Notes { get; } = new();
 
+    // Подпапки открытой папки (плитки на экране заметок).
+    public ObservableCollection<Folder> SubFolders { get; } = new();
+
+    // Путь от «Главная» до открытой папки — крошки над списком.
+    public ObservableCollection<FolderCrumb> Breadcrumbs { get; } = new();
+
     // Заметки, сгруппированные по датам (для списка на экране заметок).
     public ObservableCollection<NoteGroup> NoteGroups { get; } = new();
 
@@ -88,6 +94,10 @@ public partial class MainViewModel : ViewModelBase
     public bool IsOnEditorScreen => CurrentScreen == Screen.Editor;
     public bool IsSearchVisible => CurrentScreen != Screen.Editor;
 
+    // Крошки и плитки подпапок — только когда открыта папка.
+    public bool IsBreadcrumbVisible => CurrentScreen == Screen.Notes;
+    public bool IsSubFoldersVisible => CurrentScreen == Screen.Notes;
+
     partial void OnCurrentScreenChanged(Screen value)
     {
         OnPropertyChanged(nameof(IsOnMainScreen));
@@ -95,16 +105,29 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsOnNotesScreen));
         OnPropertyChanged(nameof(IsOnEditorScreen));
         OnPropertyChanged(nameof(IsSearchVisible));
+        OnPropertyChanged(nameof(IsBreadcrumbVisible));
+        OnPropertyChanged(nameof(IsSubFoldersVisible));
     }
 
     // === ПОИСК ===
 
     // Пересобирает видимые списки Folders/Notes из полных данных с учётом запроса.
+    // Папки делятся по уровням: на главной — только корневые, внутри папки —
+    // только её подпапки. Заметки — как раньше, по текущему экрану.
     private void ApplyFilter()
     {
+        Guid? level = CurrentScreen == Screen.Notes ? SelectedFolder?.Id : null;
+
         Folders.Clear();
-        foreach (var folder in _allFolders.Where(f => Matches(f.Name)))
+        foreach (var folder in _allFolders.Where(f => f.ParentId == level && Matches(f.Name)))
             Folders.Add(folder);
+
+        SubFolders.Clear();
+        if (CurrentScreen == Screen.Notes && SelectedFolder is not null)
+        {
+            foreach (var folder in _allFolders.Where(f => f.ParentId == SelectedFolder.Id && Matches(f.Name)))
+                SubFolders.Add(folder);
+        }
 
         Notes.Clear();
         foreach (var note in _allNotes.Where(n => Matches(n.Title) || Matches(n.Content)))
@@ -146,6 +169,70 @@ public partial class MainViewModel : ViewModelBase
     }
 
     private static readonly CultureInfo RuCulture = new("ru-RU");
+
+    // === ДЕРЕВО ПАПОК ===
+
+    // Путь от корня до папки (включая её саму), сверху вниз.
+    // Считаем по ParentId из полного списка; guard — защита от цикла в данных.
+    private List<Folder> GetPathToRoot(Folder folder)
+    {
+        var path = new List<Folder>();
+        Folder? current = folder;
+
+        while (current is not null && path.Count < 64)
+        {
+            if (path.Any(p => p.Id == current.Id)) break;  // цикл — выходим
+            path.Add(current);
+
+            var parentId = current.ParentId;
+            current = parentId is null
+                ? null
+                : _allFolders.FirstOrDefault(f => f.Id == parentId.Value);
+        }
+
+        path.Reverse();
+        return path;
+    }
+
+    // Папка + все её вложенные потомки (на любую глубину).
+    private List<Folder> GetSubtree(Folder root)
+    {
+        var result = new List<Folder> { root };
+
+        for (var i = 0; i < result.Count; i++)
+        {
+            var currentId = result[i].Id;
+            foreach (var folder in _allFolders)
+            {
+                if (folder.ParentId != currentId) continue;
+                if (result.Any(r => r.Id == folder.Id)) continue;  // цикл
+                result.Add(folder);
+            }
+        }
+
+        return result;
+    }
+
+    // Крошки: «Главная / Работа / Проекты» — клик по любому сегменту ведёт туда.
+    private void RebuildBreadcrumbs()
+    {
+        Breadcrumbs.Clear();
+
+        if (CurrentScreen != Screen.Notes || SelectedFolder is null) return;
+
+        var path = GetPathToRoot(SelectedFolder);
+
+        // «Главная» — всегда первый сегмент.
+        Breadcrumbs.Add(new FolderCrumb(null, "Главная", hasSeparator: true));
+
+        for (var i = 0; i < path.Count; i++)
+        {
+            Breadcrumbs.Add(new FolderCrumb(
+                path[i].Id,
+                path[i].Name,
+                hasSeparator: i < path.Count - 1));
+        }
+    }
 
     public MainViewModel()
     {
@@ -451,7 +538,7 @@ public partial class MainViewModel : ViewModelBase
     // === НАВИГАЦИЯ ===
 
     [RelayCommand]
-    private async Task OpenFolderAsync(Folder folder)
+    private async Task OpenFolderAsync(Folder? folder)
     {
         if (folder is null) return;
 
@@ -459,27 +546,77 @@ public partial class MainViewModel : ViewModelBase
         SelectedFolder = folder;
         CurrentTitle = folder.Name;
         CurrentScreen = Screen.Notes;
+        RebuildBreadcrumbs();
         await LoadNotesForFolderAsync(folder.Id);
     }
 
+    // Клик по крошке: «Главная» — на верхний уровень, иначе — в нужную папку.
     [RelayCommand]
-    private void GoBack()
+    private async Task OpenCrumbAsync(FolderCrumb? crumb)
+    {
+        if (crumb is null) return;
+
+        if (crumb.FolderId is null)
+        {
+            GoToRoot();
+            return;
+        }
+
+        var folder = _allFolders.FirstOrDefault(f => f.Id == crumb.FolderId.Value);
+
+        // Папку удалили, пока стояли внутри — уходим на главную.
+        if (folder is null)
+        {
+            GoToRoot();
+            return;
+        }
+
+        await OpenFolderAsync(folder);
+    }
+
+    // Возврат на верхний уровень главного экрана.
+    private void GoToRoot()
+    {
+        CurrentScreen = Screen.Folders;
+        SelectedFolder = null;
+        CurrentTitle = "Главная";
+        SearchQuery = ""; // возврат на главную — сбрасываем поиск
+        _allNotes.Clear();
+        ApplyFilter();
+        RebuildBreadcrumbs();
+    }
+
+    [RelayCommand]
+    private async Task GoBackAsync()
     {
         switch (CurrentScreen)
         {
             case Screen.Notes:
-                CurrentScreen = Screen.Folders;
-                SelectedFolder = null;
-                CurrentTitle = "Главная";
-                SearchQuery = ""; // возврат на главную — сбрасываем поиск
-                _allNotes.Clear();
-                ApplyFilter();
+                // Из вложенной папки — на уровень выше; из корневой — на главную.
+                var parentId = SelectedFolder?.ParentId;
+                var parent = parentId is null
+                    ? null
+                    : _allFolders.FirstOrDefault(f => f.Id == parentId.Value);
+
+                if (parent is null)
+                {
+                    GoToRoot();
+                }
+                else
+                {
+                    SearchQuery = ""; // выход из папки — сбрасываем поиск
+                    SelectedFolder = parent;
+                    CurrentTitle = parent.Name;
+                    RebuildBreadcrumbs();
+                    await LoadNotesForFolderAsync(parent.Id);
+                }
                 break;
 
             case Screen.Editor:
                 CurrentScreen = Screen.Notes;
                 SelectedNote = null;
                 CurrentTitle = SelectedFolder?.Name ?? "Заметки";
+                RebuildBreadcrumbs();
                 break;
         }
     }
@@ -536,15 +673,25 @@ public partial class MainViewModel : ViewModelBase
                 Debug.WriteLine("→ Экран редактора, список заметок не трогаю");
             }
 
-            // Строим видимые списки с учётом поискового запроса.
-            ApplyFilter();
-
-            // Восстанавливаем выделение по Id (независимо от фильтра).
+            // Восстанавливаем выделение по Id (независимо от фильтра) —
+            // ДО сборки списков: ApplyFilter и крошки смотрят на SelectedFolder.
             if (keepFolderId.HasValue)
                 SelectedFolder = _allFolders.FirstOrDefault(f => f.Id == keepFolderId.Value);
 
             if (keepNoteId.HasValue)
                 SelectedNote = _allNotes.FirstOrDefault(n => n.Id == keepNoteId.Value);
+
+            // Открытую папку удалили на другом устройстве — возвращаемся на главную.
+            if (CurrentScreen == Screen.Notes && SelectedFolder is null)
+            {
+                CurrentScreen = Screen.Folders;
+                CurrentTitle = "Главная";
+                _allNotes.Clear();
+            }
+
+            // Строим видимые списки с учётом поискового запроса.
+            ApplyFilter();
+            RebuildBreadcrumbs();
         }
         catch (Exception ex)
         {
@@ -622,11 +769,13 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private async Task CreateFolderAsync()
     {
+        // FAB на главной — папка верхнего уровня.
         var newFolder = new Folder
         {
             Id = Guid.NewGuid(),
             Name = "Новая папка",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            ParentId = null
         };
 
         try
@@ -641,6 +790,35 @@ public partial class MainViewModel : ViewModelBase
         catch (Exception ex)
         {
             Debug.WriteLine($"→ ОШИБКА создания папки: {ex.Message}");
+        }
+    }
+
+    // «Новая папка» на экране заметок — подпапка текущей.
+    [RelayCommand]
+    private async Task CreateSubFolderAsync()
+    {
+        if (SelectedFolder is null) return;
+
+        var newFolder = new Folder
+        {
+            Id = Guid.NewGuid(),
+            Name = "Новая папка",
+            CreatedAt = DateTime.UtcNow,
+            ParentId = SelectedFolder.Id
+        };
+
+        try
+        {
+            var created = await _api.CreateFolderAsync(newFolder);
+            if (created is null) return;
+
+            _allFolders.Insert(0, created);
+            ApplyFilter();
+            Debug.WriteLine("→ Подпапка создана");
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"→ ОШИБКА создания подпапки: {ex.Message}");
         }
     }
 
@@ -668,7 +846,7 @@ public partial class MainViewModel : ViewModelBase
             {
                 SelectedNote = null;
                 if (CurrentScreen == Screen.Editor)
-                    GoBack();
+                    await GoBackAsync();
             }
 
             _allNotes.Remove(note);
@@ -691,23 +869,43 @@ public partial class MainViewModel : ViewModelBase
 
         try
         {
-            await _api.DeleteFolderAsync(folder.Id);
+            // Дерево папки: подпапки любого уровня. Сервер удалит всё разом,
+            // а при undo мы вернём именно то, что было в дереве.
+            var subtree = GetSubtree(folder);
+            var subtreeIds = subtree.Select(f => f.Id).ToHashSet();
 
-            if (SelectedFolder == folder)
-                SelectedFolder = null;
-
-            _allFolders.Remove(folder);
-            ApplyFilter();
-            Debug.WriteLine("→ Папка удалена");
-
-            // Запоминаем заметки папки: при undo восстановим и их тоже
-            // (сервер папке их не возвращает — только сам клиент явно).
-            var childNoteIds = _allNotes
-                .Where(n => n.FolderId == folder.Id)
+            // Заметки дерева берём с сервера: локальный список может быть
+            // неполным (на экране папки загружены только её заметки).
+            var allNotes = await _api.GetNotesAsync();
+            var childNoteIds = allNotes
+                .Where(n => n.FolderId is not null && subtreeIds.Contains(n.FolderId.Value))
                 .Select(n => n.Id)
                 .ToList();
 
-            StartUndo(new PendingUndo { Folder = folder, ChildNoteIds = childNoteIds });
+            await _api.DeleteFolderAsync(folder.Id);
+
+            // Стоим внутри удаляемого дерева — уходим на главную.
+            if (SelectedFolder is not null && subtreeIds.Contains(SelectedFolder.Id))
+            {
+                SelectedFolder = null;
+                if (CurrentScreen == Screen.Notes) GoToRoot();
+            }
+
+            foreach (var deleted in subtree)
+                _allFolders.Remove(deleted);
+
+            ApplyFilter();
+            RebuildBreadcrumbs();
+            Debug.WriteLine("→ Папка удалена (вместе с подпапками)");
+
+            // Запоминаем подпапки и заметки дерева: при undo восстановим их тоже
+            // (сервер папке их не возвращает — только сам клиент явно).
+            StartUndo(new PendingUndo
+            {
+                Folder = folder,
+                ChildFolderIds = subtree.Where(f => f.Id != folder.Id).Select(f => f.Id).ToList(),
+                ChildNoteIds = childNoteIds
+            });
         }
         catch (Exception ex)
         {
@@ -722,6 +920,7 @@ public partial class MainViewModel : ViewModelBase
     {
         public Note? Note;
         public Folder? Folder;
+        public List<Guid> ChildFolderIds = new();
         public List<Guid> ChildNoteIds = new();
     }
 
@@ -773,7 +972,11 @@ public partial class MainViewModel : ViewModelBase
             {
                 await _api.RestoreFolderAsync(undo.Folder.Id);
 
-                // Заметки папки восстанавливаем по-отдельности.
+                // Подпапки и заметки возвращаем по-отдельности:
+                // сервер восстанавливает только саму папку.
+                foreach (var folderId in undo.ChildFolderIds)
+                    await _api.RestoreFolderAsync(folderId);
+
                 foreach (var noteId in undo.ChildNoteIds)
                     await _api.RestoreNoteAsync(noteId);
 

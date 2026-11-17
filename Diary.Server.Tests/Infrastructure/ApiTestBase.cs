@@ -65,14 +65,15 @@ public abstract class ApiTestBase : IDisposable
         return id;
     }
 
-    protected async Task<Guid> CreateFolderAsync(string name = "Тестовая папка")
+    protected async Task<Guid> CreateFolderAsync(string name = "Тестовая папка", Guid? parentId = null)
     {
         var id = Guid.NewGuid();
         var response = await PostJsonAsync("/folders", new
         {
             id,
             name,
-            createdAt = DateTime.UtcNow
+            createdAt = DateTime.UtcNow,
+            parentId
         });
         response.EnsureSuccessStatusCode();
         return id;
